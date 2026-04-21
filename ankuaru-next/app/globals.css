@@ -1,0 +1,281 @@
+@import "./legacy.css";
+@import "tailwindcss";
+
+:root {
+  --background: #f2eee8;
+  --foreground: #1a1208;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-mono: "SF Mono", Menlo, Consolas, monospace;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+  }
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.app-shell {
+  min-height: 100vh;
+}
+
+.sidebar-auth-panel {
+  margin-top: auto;
+  margin-inline: 10px;
+  margin-bottom: 8px;
+  border: 1px solid #3a2a1a;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  padding: 8px;
+  display: grid;
+  gap: 8px;
+}
+
+.sidebar-auth-user {
+  font-size: 10px;
+  color: #d7c2a0;
+  letter-spacing: 0.02em;
+}
+
+.sidebar-logout-btn {
+  border: 1px solid rgba(212, 130, 10, 0.34);
+  border-radius: 6px;
+  background: rgba(212, 130, 10, 0.13);
+  color: #e2be86;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 6px 8px;
+}
+
+.marketplace-top-tabs {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: 12px;
+}
+
+.marketplace-tabs-label {
+  font-size: 10px;
+  color: var(--tx3, #9a8a7a);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.marketplace-tab {
+  border: 1px solid #d8cdb8;
+  border-radius: 999px;
+  background: #fff;
+  color: var(--tx2, #6a5a4a);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 6px 12px;
+}
+
+.marketplace-tab.active {
+  border-color: rgba(124, 58, 237, 0.4);
+  color: #5b35ba;
+  background: rgba(124, 58, 237, 0.08);
+}
+
+/* Marketplace readability adjustments */
+.l4-card-countdown__eyebrow {
+  font-size: 12px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.03em;
+}
+
+.l4-card-countdown__value .l4-timer {
+  font-size: 36px !important;
+  font-weight: 800 !important;
+  line-height: 1.05;
+}
+
+.l4-card-countdown__sub {
+  font-size: 11px !important;
+}
+
+.l4-card-type-label {
+  font-size: 10px;
+  color: var(--tx3, #9a8a7a);
+}
+
+.l4-card-type-label--prominent {
+  font-size: 14px;
+  font-weight: 700;
+  color: #5b35ba;
+  letter-spacing: 0.01em;
+}
+
+/* New Listing wizard contrast fixes */
+#l4-wiz-ov .wizard,
+#l4-wiz-ov .wizard * {
+  color: #1a1208;
+}
+
+#l4-wiz-ov .wizard {
+  width: min(96vw, 980px) !important;
+  max-width: 980px !important;
+}
+
+#l4-wiz-ov .wizard input,
+#l4-wiz-ov .wizard select,
+#l4-wiz-ov .wizard textarea {
+  color: #1a1208 !important;
+  opacity: 1 !important;
+  -webkit-text-fill-color: #1a1208;
+}
+
+#l4-wiz-ov .wizard input::placeholder,
+#l4-wiz-ov .wizard textarea::placeholder {
+  color: #6a5a4a !important;
+  opacity: 1 !important;
+}
+
+#l4-wiz-ov .wizard select option {
+  color: #1a1208;
+  background: #ffffff;
+}
+
+#l4-wiz-ov .wizard button {
+  color: #1a1208;
+  opacity: 1 !important;
+}
+
+#l4-wiz-ov .wizard button[disabled] {
+  color: #4b3b2b !important;
+  opacity: 1 !important;
+}
+
+/* Marketplace columns: independent scrolling per category column */
+.l4-market-cols {
+  align-items: stretch !important;
+}
+
+.l4-cat-col {
+  height: 560px;
+  min-height: 560px;
+}
+
+.l4-cat-stack {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+@media (max-width: 900px) {
+  .l4-cat-col {
+    height: auto;
+    min-height: unset;
+  }
+  .l4-cat-stack {
+    overflow-y: visible;
+    padding-right: 0;
+  }
+}
+
+.login-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg, #f2eee8);
+}
+
+.login-card {
+  width: min(420px, 94vw);
+  background: #fff;
+  border: 1px solid var(--border, #e8e0d4);
+  box-shadow: 0 22px 40px rgba(26, 18, 8, 0.12);
+  border-radius: 12px;
+  padding: 26px;
+}
+
+.login-brand-title {
+  color: var(--amber, #d4820a);
+  letter-spacing: 0.06em;
+  font-weight: 700;
+}
+
+.login-brand-sub {
+  color: var(--tx3, #9a8a7a);
+  font-size: 11px;
+  margin-top: 2px;
+}
+
+.login-title {
+  font-size: 24px;
+  margin-top: 14px;
+  color: var(--tx, #1a1208);
+}
+
+.login-note {
+  margin-top: 6px;
+  color: var(--tx2, #6a5a4a);
+  font-size: 12px;
+}
+
+.login-form {
+  display: grid;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.login-label {
+  font-size: 11px;
+  color: var(--tx2, #6a5a4a);
+}
+
+.login-input {
+  border: 1px solid var(--border, #e8e0d4);
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: #fff;
+}
+
+.login-input:focus {
+  outline: none;
+  border-color: var(--amber, #d4820a);
+  box-shadow: 0 0 0 2px rgba(212, 130, 10, 0.2);
+}
+
+.login-btn {
+  margin-top: 8px;
+  border: 1px solid rgba(212, 130, 10, 0.34);
+  border-radius: 8px;
+  background: rgba(212, 130, 10, 0.13);
+  color: #7a4a00;
+  font-weight: 700;
+  padding: 10px 12px;
+}
+
+.login-btn:disabled {
+  opacity: 0.5;
+}
+
+.login-error {
+  margin-top: 2px;
+  color: #b23a3a;
+  font-size: 12px;
+}
+
+.login-help {
+  margin-top: 14px;
+  border-top: 1px dashed var(--border, #e8e0d4);
+  padding-top: 10px;
+  font-size: 11px;
+  color: var(--tx3, #9a8a7a);
+  display: grid;
+  gap: 3px;
+}

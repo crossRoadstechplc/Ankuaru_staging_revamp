@@ -1,0 +1,40 @@
+{
+  "categories": [
+    "Coffee",
+    "Fruit Crops",
+    "Grains and Cereals",
+    "Oil Seeds",
+    "Pulses & Legumes",
+    "Root Crops",
+    "Spice & Herbs",
+    "Vegetables",
+    "Building Materials"
+  ],
+  "productsByCategory": {
+    "Coffee": ["Export Coffee", "Roasted Coffee", "Reject Coffee"],
+    "Fruit Crops": ["Banana", "Avocado", "Mango", "Papaya", "Strawberry", "Apple", "Watermelon", "Pineapple", "Lemon", "Orange", "Guava"],
+    "Grains and Cereals": ["Teff", "Wheat", "Sorghum", "Oats", "Barley", "Maize", "Finger Millet", "Rice"],
+    "Oil Seeds": ["Niger Seed", "Groundnuts", "Castor Seed", "Pumpkin Seed", "Linseed", "Sunflower", "Cotton Seed", "Sesame Seed"],
+    "Pulses & Legumes": ["Fava Beans", "Lupin Beans", "Lentils", "Grass Peas", "Red Kidney Beans", "White Pea Beans", "Green Mung Beans", "Chickpeas", "Soya Beans", "Pinto Beans", "White Pigeon Beans", "Soya Bean Meal"],
+    "Root Crops": ["Potato", "Sweet Potato", "Cassava", "Yam"],
+    "Spice & Herbs": ["Black Cumin", "Fenugreek", "Pepper", "Coriander", "Cardamom", "Turmeric", "Black Pepper"],
+    "Vegetables": ["Lettuce", "Cabbage", "Cauliflower", "Tomatoes", "Qarya", "Swiss Chard", "Green Beans", "Eggplant", "Broccoli", "Okra", "Celery", "Squash", "Zucchini", "Cucumber"],
+    "Building Materials": ["Cement", "Steel", "Sand", "Timber", "Brocks and Concrete Block", "Insulation Materials", "Glass", "Board"]
+  },
+  "unitsByCategory": {
+    "Coffee": ["KG", "TON", "Bag", "Kesha", "Quintal", "Feresula", "FCL"],
+    "Spice & Herbs": ["KG", "Quintal", "Ton", "FCL", "Feresula"],
+    "Pulses & Legumes": ["KG", "Quintal", "Ton", "FCL"],
+    "Vegetables": ["KG", "Quintal", "Ton", "FCL"],
+    "Oil Seeds": ["KG", "Quintal", "Ton", "FCL"],
+    "Fruit Crops": ["KG", "Quintal", "Ton", "FCL"],
+    "Building Materials": ["KG", "Quintal", "Ton", "FCL"],
+    "Grains and Cereals": ["KG", "Quintal", "Ton", "FCL"],
+    "Root Crops": ["KG", "Quintal", "Ton", "FCL"]
+  },
+  "currencies": ["ETB", "USD", "EUR", "GBP"],
+  "exportCoffeeRegions": ["Yirgacheffe", "Kochere", "Guji", "Limu", "Godere", "Anderacha", "Bebeka", "Tepi", "Jimma", "Bale", "Wenago", "Gelana Abaya", "Sidama", "Kaffa", "Yeki", "Bench Maji", "Kelem Wollega", "Gimbi", "Lekempti", "Harar", "Forest", "Illubabor", "Any Region"],
+  "exportCoffeeGrades": ["1", "2", "3", "4", "5", "NG", "UG"],
+  "exportCoffeeProcesses": ["washed", "unwashed", "fermented"],
+  "sesameTypes": ["white", "redish", "mixed"]
+}
