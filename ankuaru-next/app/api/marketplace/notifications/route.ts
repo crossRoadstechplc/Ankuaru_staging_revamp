@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import {
   appendNotifications,
   markNotificationsRead,
+  type MarketplaceNotification,
+  type NotificationMap,
   readNotifications,
   writeNotifications,
 } from "@/lib/marketplace/social-store";
@@ -11,6 +13,41 @@ export const dynamic = "force-dynamic";
 const noStore = {
   "Cache-Control": "private, no-store, max-age=0, must-revalidate",
 };
+
+function toNotificationMap(input: unknown): NotificationMap | null {
+  if (!input || typeof input !== "object" || Array.isArray(input)) return null;
+  const out: NotificationMap = {};
+  for (const [userId, list] of Object.entries(input as Record<string, unknown>)) {
+    if (!Array.isArray(list)) return null;
+    const mapped: MarketplaceNotification[] = [];
+    for (const item of list) {
+      if (!item || typeof item !== "object") return null;
+      const raw = item as Record<string, unknown>;
+      if (
+        typeof raw.id !== "string" ||
+        (raw.type !== "new_follower_listing" && raw.type !== "bid_placed") ||
+        typeof raw.listingId !== "string" ||
+        typeof raw.fromUser !== "string" ||
+        typeof raw.title !== "string" ||
+        typeof raw.createdAt !== "string" ||
+        typeof raw.read !== "boolean"
+      ) {
+        return null;
+      }
+      mapped.push({
+        id: raw.id,
+        type: raw.type,
+        listingId: raw.listingId,
+        fromUser: raw.fromUser,
+        title: raw.title,
+        createdAt: raw.createdAt,
+        read: raw.read,
+      });
+    }
+    out[userId] = mapped;
+  }
+  return out;
+}
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -25,12 +62,13 @@ export async function GET(request: Request) {
 }
 
 export async function PUT(request: Request) {
-  const body = (await request.json()) as { notifications?: Record<string, unknown[]> };
-  if (!body.notifications || typeof body.notifications !== "object") {
+  const body = (await request.json()) as { notifications?: unknown };
+  const notifications = toNotificationMap(body.notifications);
+  if (!notifications) {
     return NextResponse.json({ message: "Invalid notifications payload." }, { status: 400 });
   }
-  await writeNotifications(body.notifications);
-  return NextResponse.json({ ok: true, count: Object.keys(body.notifications).length }, { headers: noStore });
+  await writeNotifications(notifications);
+  return NextResponse.json({ ok: true, count: Object.keys(notifications).length }, { headers: noStore });
 }
 
 export async function POST(request: Request) {
