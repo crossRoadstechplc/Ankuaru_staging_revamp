@@ -4,7 +4,7 @@ import { create } from "zustand";
 import { MARKET_DATA } from "@/lib/data/seed";
 import type { SanitizedUser } from "@/lib/auth/users";
 
-type ViewMode = "cards" | "timeline";
+type ViewMode = "welcome" | "cards" | "timeline" | "market";
 type StatusFilter = "ALL" | "PENDING" | "DISPATCHED" | "EXPORTED";
 
 type AppStore = {
@@ -31,6 +31,7 @@ type AppStore = {
   setViewMode: (value: ViewMode) => void;
   setStatusFilter: (value: StatusFilter) => void;
   setRibbonTab: (value: string) => void;
+  setNotificationsUnreadCount: (value: number) => void;
   toggleNotif: () => void;
   login: (user: SanitizedUser) => void;
   logout: () => void;
@@ -42,14 +43,14 @@ export const useAppStore = create<AppStore>((set) => ({
   userMonogram: "NI",
   accountId: "ACT-EXP-MAIN",
   searchQuery: "",
-  viewMode: "cards",
+  viewMode: "welcome",
   statusFilter: "ALL",
   ribbonTab: "home",
   backstageOpen: true,
   notifOpen: false,
   detailOpen: false,
   wizardOpen: false,
-  notificationsUnreadCount: 5,
+  notificationsUnreadCount: 0,
   nycArabicaCents: MARKET_DATA.nycArabicaCents,
   etbRate: MARKET_DATA.etbRate,
   alertChipText: MARKET_DATA.alertChipText,
@@ -60,6 +61,7 @@ export const useAppStore = create<AppStore>((set) => ({
   setViewMode: (value) => set({ viewMode: value }),
   setStatusFilter: (value) => set({ statusFilter: value }),
   setRibbonTab: (value) => set({ ribbonTab: value }),
+  setNotificationsUnreadCount: (value) => set({ notificationsUnreadCount: value }),
   toggleNotif: () => set((state) => ({ notifOpen: !state.notifOpen })),
   login: (user) =>
     set({
@@ -67,6 +69,7 @@ export const useAppStore = create<AppStore>((set) => ({
       isAuthenticated: true,
       userMonogram: user.username.slice(0, 2).toUpperCase(),
       accountId: user.username,
+      viewMode: "welcome",
     }),
   logout: () =>
     set({
@@ -74,5 +77,6 @@ export const useAppStore = create<AppStore>((set) => ({
       isAuthenticated: false,
       userMonogram: "NI",
       accountId: "ACT-EXP-MAIN",
+      viewMode: "welcome",
     }),
 }));

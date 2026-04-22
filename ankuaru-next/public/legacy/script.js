@@ -100,6 +100,8 @@ let CONTAINERS=[
 const traceCache={}, treeExp={}, detsOpen={}, cardExp={};
 let activeExp=null, activeSt=null, activeCont=null, activeTab="overview";
 let viewMode="cards", activeRibbon="home";
+/** When true, main canvas shows the welcome overlay only (no portfolio/market grid). */
+let welcomeAtHome=true;
 let notifOpen=false, bsOpen=false, wizOpen=false;
 let wizStep=0;
 const wizData={};
@@ -196,29 +198,16 @@ const ACTIVE_PERSONA_UID="ACT-EXP-MAIN";
 function activePersona(){return ACTOR_REGISTRY[ACTIVE_PERSONA_UID]||{name:"Kaffa Trading PLC"};}
 // ═══════════════════════════════════════════════════════════════
 
-const LISTINGS={
-  "LIST-IOI-0042":{type:"IOI",state:"LIVE",lot:"EXP-0087",seller:"ACT-EXP-002",sellerVisible:true,weight:17400,grade:"Yirgacheffe G1 Washed",priceMode:"Outright",priceUSDkg:12.79,priceUSDlb:5.80,incoterm:"At Mill Yirgacheffe",duration:"14 days",ends:"26 Apr 2026",visibility:["Open Market","Rating-gated ≥4★"],bids:0,quality:"SCA 88.25",eudr:true,note:"Specialty buyers, prior YCFCU experience preferred."},
-  "LIST-RFQ-0118":{type:"RFQ",state:"ENGAGED",lot:null,buyer:"ACT-UNI-OCFCU",buyerCompany:"Oromia Coffee Farmers Cooperative Union",weight:18000,grade:"Sidamo G1/G2 Natural",priceMode:"Differential",differential:"NY-C +85¢",incoterm:"At Modjo Dry Port",duration:"7 days",ends:"19 Apr 2026",visibility:["Invite-only (12 exporters)"],offers:4,quality:"SCA ≥85 required",eudr:true,note:"Quality binding: price-adjustable, ±5¢ per cup point."},
-  "LIST-ENG-0007":{type:"ENG",state:"LIVE",lot:"EXP-0156",seller:"ACT-EXP-002",sellerVisible:false,weight:16800,grade:"Guji G1 Natural",priceMode:"Outright",reserveUSDkg:10.58,reserveUSDlb:4.80,currentUSDkg:11.57,currentUSDlb:5.25,minIncrement:"0.05 USD/kg",incoterm:"At Mill Hambela",ends:"15 Apr 2026 18:00 UTC",antiSniping:"5-min extension, 30-min cap",visibility:["Rating-gated ≥4★","Region: EU + UK + JP"],bids:7,quality:"SCA 89.75",eudr:true},
-  "LIST-SEL-0019":{type:"SEALED",state:"LIVE",lot:"EXP-0023",seller:"ACT-EXP-002",sellerVisible:false,weight:17500,grade:"Sidama G1 Washed",priceMode:"Outright",reserveUSDkg:10.05,reserveUSDlb:4.56,ends:"22 Apr 2026 12:00 UTC",visibility:["Invite-only (8 importers)"],bidsReceived:5,quality:"SCA 86.75",eudr:true,note:"Fully blind until close. No bid visibility."},
-  "LIST-REV-0003":{type:"REV",state:"LIVE",lot:null,buyer:"ACT-UNI-SCFCU",buyerCompany:"Sidama Coffee Farmers Cooperative Union",weight:20000,grade:"Yirgacheffe Washed, SCA ≥87",priceMode:"Outright",ceilingUSDkg:13.23,ceilingUSDlb:6.00,currentLowUSDkg:12.57,currentLowUSDlb:5.70,incoterm:"At Exporter Warehouse Addis",ends:"18 Apr 2026",visibility:["Open Market","Verification: Enhanced only"],bids:6,quality:"Required: SCA ≥87, EUDR ready",eudr:true},
-  "LIST-ENG-0042":{type:"ENG",state:"LIVE",lot:null,seller:"ACT-EXP-MAIN",sellerVisible:true,weight:17000,grade:"Limu G1 Washed",priceMode:"Outright",reserveUSDkg:9.26,reserveUSDlb:4.20,currentUSDkg:10.03,currentUSDlb:4.55,minIncrement:"0.05 USD/lb",incoterm:"At Mill Limu",ends:"20 Apr 2026 16:00 UTC",antiSniping:"5-min extension, 30-min cap",visibility:["Open Market","EU + US + JP","Rating-gated ≥4★"],bids:3,quality:"SCA 87.50",eudr:true,note:"Kaffa Trading flagship · Anderacha washing station · 2025/26 harvest peak"}
-};
+const LISTINGS={};
 
 function l4NormalizeAuctionTimers(){
-  const M=6e4,H=60*M;
-  const MAX_DURATION=23*H+50*M; // keep demo timers below 1 day
-  const DEFAULT_DURATION={ENG:35*M,SEALED:9*H,REV:2*H+30*M};
-  const now=Date.now();
+  const closeAt=l4NextAuctionCloseLT().getTime();
   for(const id in LISTINGS){
     const L=LISTINGS[id];
     if(!(L.type==="ENG"||L.type==="SEALED"||L.type==="REV"))continue;
     if(!L.__initialState)L.__initialState=L.state||"LIVE";
-    const fallback=DEFAULT_DURATION[L.type]||45*M;
-    const remaining=L.endsAt?Math.max(0,L.endsAt-now):fallback;
-    const duration=(remaining>MAX_DURATION||remaining===0)?fallback:remaining;
-    L.__loopDurationMs=duration;
-    L.endsAt=now+duration;
+    L.endsAt=closeAt;
+    L.ends=fmtEAT(new Date(closeAt));
   }
 }
 
@@ -309,8 +298,8 @@ function genMilestones(c){
 const RIBBON_DEFS={
   home:{groups:[
     {items:[
-      {icon:'<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="1" width="6" height="6" rx="1"/><rect x="9" y="1" width="6" height="6" rx="1"/><rect x="1" y="9" width="6" height="6" rx="1"/><rect x="9" y="9" width="6" height="6" rx="1"/></svg>',label:"Cards",fn:"setView('cards')",isOn:()=>viewMode==="cards"},
-      {icon:'<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="1" y1="4" x2="5" y2="4"/><line x1="7" y1="4" x2="15" y2="4"/><line x1="1" y1="8" x2="5" y2="8"/><line x1="7" y1="8" x2="15" y2="8"/><line x1="1" y1="12" x2="5" y2="12"/><line x1="7" y1="12" x2="15" y2="12"/></svg>',label:"Timeline",fn:"setView('timeline')",isOn:()=>viewMode==="timeline"},
+      {icon:'<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="1" width="6" height="6" rx="1"/><rect x="9" y="1" width="6" height="6" rx="1"/><rect x="1" y="9" width="6" height="6" rx="1"/><rect x="9" y="9" width="6" height="6" rx="1"/></svg>',label:"Cards",fn:"setView('cards')",isOn:()=>!welcomeAtHome&&viewMode==="cards"},
+      {icon:'<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="1" y1="4" x2="5" y2="4"/><line x1="7" y1="4" x2="15" y2="4"/><line x1="1" y1="8" x2="5" y2="8"/><line x1="7" y1="8" x2="15" y2="8"/><line x1="1" y1="12" x2="5" y2="12"/><line x1="7" y1="12" x2="15" y2="12"/></svg>',label:"Timeline",fn:"setView('timeline')",isOn:()=>!welcomeAtHome&&viewMode==="timeline"},
     ]},
     {sep:true},
     {items:[
@@ -373,40 +362,46 @@ const RIBBON_DEFS={
       {icon:'<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 1v14M1 8h14"/></svg>',label:"Related Parties",fn:"toast('Related-party graph — Phase 2')"},
     ]},
   ]},
-  compliance:{groups:[
+  transactions:{groups:[
     {items:[
-      {icon:'<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 1l5 3v4c0 3-2 5-5 7C3 13 1 11 1 8V4z"/></svg>',label:"GPS Report",fn:"toast('GPS coverage report — Phase 2')"},
-      {icon:'<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 1l5 3v4c0 3-2 5-5 7C3 13 1 11 1 8V4z"/><path d="M5 8l2 2 4-3"/></svg>',label:"EUDR Pack",fn:"toast('EUDR pack — Phase 2')"},
-      {icon:'<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="1" width="12" height="14" rx="1"/><line x1="5" y1="5" x2="11" y2="5"/><line x1="5" y1="8" x2="11" y2="8"/><line x1="5" y1="11" x2="8" y2="11"/></svg>',label:"Audit Log",fn:"toast('Audit log — Phase 2')"},
+      {icon:'<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 4h4v2H2V4zm4 6H2V8h4v2zm-4 4h4v-2H2v2zM8 4h6v2H8V4zm0 3h6v2H8V7zm0 3h6v2H8v-2z"/></svg>',label:"Legacy offers",fn:"toast('Inquiries and offers from platform export')"},
+      {icon:'<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 2h7l3 3v9H2V2z"/><path d="M5 5h3M5 8h3M5 11h1"/></svg>',label:"Filter",fn:"(function(){var e=document.getElementById('l4-market-inq-search');if(e){e.focus();e.select()}})()"},
     ]},
   ]},
-  reports:{groups:[
+  followers:{groups:[
     {items:[
-      {icon:'<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="1" width="10" height="14" rx="1"/><path d="M5 5h6M5 8h6M5 11h3"/><path d="M9 1v4h5"/></svg>',label:"Trace PDF",fn:"toast('Trace PDF…')",dimIf:()=>!activeCont},
-      {icon:'<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="1" width="14" height="14" rx="1"/><path d="M1 5h14M5 5v10M9 5v10"/></svg>',label:"Portfolio CSV",fn:"toast('Exporting CSV…')"},
-      {icon:'<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="3" width="14" height="10" rx="2"/><path d="M5 8h6M8 5v6"/></svg>',label:"Cup Report",fn:"toast('Cup report — Phase 2')"},
-    ]},
-    {sep:true},
-    {items:[
-      {icon:'<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 12h12M8 2v7M5 6l3 3 3-3"/></svg>',label:"Print View",fn:"toast('Print view…')"},
+      {icon:'<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="5" r="3"/><path d="M2 14c0-3 2.7-5 6-5s6 2 6 5"/></svg>',label:"Followers",fn:"toast('Follower list for current user')"},
     ]},
   ]},
 };
 
 function switchRTab(id,btn){
+  welcomeAtHome=false;
+  setPortfolioWelcomeVisible(false);
   activeRibbon=id;
   document.querySelectorAll(".rtab").forEach(t=>t.classList.remove("active"));
   if(btn)btn.classList.add("active");
   else document.getElementById("tab-"+id)?.classList.add("active");
   renderRibbon();
-  // Sync detail tab for context tabs
   if(id==="contracts")switchDTab("lc",null);
   else if(id==="trace")switchDTab("trace",null);
   else if(id==="quality")switchDTab("quality",null);
+  if(id==="transactions"){
+    if(typeof window!=="undefined")window.__ANKUARU_MARKET_INQ_BYID={};
+    window.__ANKUARU_MARKET_INQ_LIST={loading:false,items:[],offset:0,total:0,limit:40,loadedOnce:false,error:null};
+  }
+  if(typeof viewMode!=="undefined"&&viewMode==="market"&&typeof renderMarket==="function")renderMarket();
+  else if(typeof renderView==="function")renderView();
 }
 function renderRibbon(){
   const def=RIBBON_DEFS[activeRibbon];
   if(!def)return;
+  const coreTabs=["tab-home","tab-actors","tab-transactions","tab-followers"];
+  const showCoreTabs=!welcomeAtHome;
+  coreTabs.forEach(function(id){
+    var el=document.getElementById(id);
+    if(el)el.style.display=showCoreTabs?"":"none";
+  });
   // Context strip (height must stay in sync with .ribbon.ctx-on + .app-body in styles.css)
   const strip=document.getElementById("ctx-strip");
   const stripInner=document.getElementById("ctx-strip-inner");
@@ -420,8 +415,13 @@ function renderRibbon(){
     stripInner.innerHTML="";
     ribbon.classList.remove("ctx-on");
   }
-  // Ribbon body
   const rb=document.getElementById("rbody");
+  if(viewMode==="market"||welcomeAtHome){
+    rb.innerHTML="";
+    ribbon.classList.add("ribbon--market");
+    return;
+  }
+  ribbon.classList.remove("ribbon--market");
   let html="";
   def.groups.forEach(g=>{
     if(g.sep){html+='<div class="rdiv"></div>';return;}
@@ -474,6 +474,8 @@ function filterSt(s,btn){
   renderView();
 }
 function setView(m,btn){
+  welcomeAtHome=false;
+  setPortfolioWelcomeVisible(false);
   viewMode=m;
   const auctionNav=document.getElementById("bsn-auction");
   if(auctionNav)auctionNav.classList.toggle("on",m==="market");
@@ -481,9 +483,11 @@ function setView(m,btn){
   document.getElementById("v-timeline").classList.toggle("on",m==="timeline");
   renderView();
   renderRibbon();
+  if(typeof window!=="undefined"&&window.__ANKUARU_LEGACY_MAIN_VIEW)window.__ANKUARU_LEGACY_MAIN_VIEW(m);
 }
 /** Importer sidebar — open live auction / listing grid in the main canvas (closes backstage overlay). */
 function openAuctionFromSidebar(btn){
+  welcomeAtHome=false;
   const homeTab=document.getElementById("tab-home");
   if(typeof switchRTab==="function")switchRTab("home",homeTab||null);
   document.querySelectorAll(".bs-navitem").forEach(function(b){b.classList.remove("on");});
@@ -510,6 +514,10 @@ function filtered(){
 }
 function renderView(){renderFilteredView(filtered());}
 function renderFilteredView(fl){
+  if(welcomeAtHome){
+    updateStatusBar();
+    return;
+  }
   if(viewMode==="market")renderMarket();
   else if(viewMode==="timeline")renderTL(fl);
   else renderGrid(fl);
@@ -519,26 +527,11 @@ function renderFilteredView(fl){
 /* L4 INJECT */
 // Bake live end timestamps + LISTED lot mapping (v12)
 (function(){
-  const M=6e4,H=60*M,D=24*H;
-  const demoEnds={
-    "LIST-ENG-0007":30*M,
-    "LIST-ENG-0042":28*M,
-    "LIST-SEL-0019":D+5*H,
-    "LIST-REV-0003":2*H+40*M,
-    "LIST-IOI-0042":3*D,
-    "LIST-RFQ-0118":6*D+12*H,
-  };
+  const demoEnds={};
   for(const k in demoEnds){if(LISTINGS[k])LISTINGS[k].endsAt=Date.now()+demoEnds[k];}
   l4BackfillListingTaxonomy();
   l4NormalizeAuctionTimers();
-  // Mark referenced lots as LISTED
   for(const k in LISTINGS){const L=LISTINGS[k];if(L.lot&&L.state==="LIVE"){const c=CONTAINERS.find(x=>x.exp===L.lot||x.id===L.lot);if(c)c.listed=k;}}
-  // English auction config
-  if(LISTINGS["LIST-ENG-0007"]){LISTINGS["LIST-ENG-0007"].minIncrementUSD=0.05;LISTINGS["LIST-ENG-0007"].antiSnipingMin=5;LISTINGS["LIST-ENG-0007"].hardCapMin=30;LISTINGS["LIST-ENG-0007"].bidHistory=[{actor:"Buyer #A4",amount:4.80,when:"2h ago"},{actor:"Buyer #B1",amount:4.95,when:"1h ago"},{actor:"Buyer #C7",amount:5.05,when:"45m ago"},{actor:"Buyer #A4",amount:5.15,when:"22m ago"},{actor:"Buyer #B1",amount:5.25,when:"8m ago"}];}
-  if(LISTINGS["LIST-SEL-0019"]){LISTINGS["LIST-SEL-0019"].sealedBids=5;}
-  if(LISTINGS["LIST-ENG-0042"]){LISTINGS["LIST-ENG-0042"].minIncrementUSD=0.05;LISTINGS["LIST-ENG-0042"].antiSnipingMin=5;LISTINGS["LIST-ENG-0042"].hardCapMin=30;LISTINGS["LIST-ENG-0042"].bidHistory=[{actor:"Buyer #K3",amount:4.20,when:"3h ago"},{actor:"Buyer #L8",amount:4.35,when:"1h ago"},{actor:"Buyer #M1",amount:4.55,when:"25m ago"}];}
-  if(LISTINGS["LIST-REV-0003"]){LISTINGS["LIST-REV-0003"].bidHistory=[{actor:"Seller #X1",amount:5.95,when:"3h ago"},{actor:"Seller #Y2",amount:5.85,when:"2h ago"},{actor:"Seller #Z4",amount:5.80,when:"1h ago"},{actor:"Seller #X1",amount:5.75,when:"30m ago"},{actor:"Seller #W7",amount:5.70,when:"10m ago"}];}
-  if(LISTINGS["LIST-RFQ-0118"]){LISTINGS["LIST-RFQ-0118"].bidHistory=[{actor:"Exporter #M2",amount:3.25,when:"5h ago"},{actor:"Exporter #N5",amount:3.40,when:"3h ago"},{actor:"Exporter #P1",amount:3.55,when:"1h ago"},{actor:"Exporter #M2",amount:3.70,when:"20m ago"}];}
 })();
 
 
@@ -1502,8 +1495,9 @@ const DELIVERY_LOCATIONS=[
   {id:"at-modjo",label:"At Modjo Dry Port",scope:"domestic"},
   {id:"delivered-addis",label:"Delivered Addis Ababa",scope:"domestic"}
 ];
-function fmtEAT(d){const eat=new Date(d.getTime()+3*36e5);const gmt=new Date(d.getTime());const pad=n=>String(n).padStart(2,"0");return`${pad(eat.getUTCHours())}:${pad(eat.getUTCMinutes())} EAT (${pad(gmt.getUTCHours())}:${pad(gmt.getUTCMinutes())} GMT)`;}
-function todayClose17EAT(){const d=new Date();d.setUTCHours(14,0,0,0);if(d.getTime()<Date.now())d.setUTCDate(d.getUTCDate()+1);return d;}
+function fmtEAT(d){const pad=n=>String(n).padStart(2,"0");return`${pad(d.getHours())}:${pad(d.getMinutes())} LT`;}
+function todayClose17EAT(){const d=new Date();d.setHours(16,0,0,0);if(d.getTime()<Date.now())d.setDate(d.getDate()+1);return d;}
+function l4NextAuctionCloseLT(){return todayClose17EAT();}
 
 let L4_NEW={};let l4Step=0;
 const L4_MECH=[
@@ -1515,6 +1509,7 @@ const L4_MECH=[
 ];
 const L4_VIS=[
   {id:"open",label:"Open Market",desc:"Any verified actor"},
+  {id:"followers",label:"Followers only",desc:"Only accounts following you can view and bid"},
   {id:"invite",label:"Invite-Only",desc:"Pick specific actors (filter by rating, role, region)"},
   {id:"rating",label:"Rating ≥ 4★",desc:"Quality-history gate (auto-filter)"},
   {id:"region",label:"Region: EU + UK + JP",desc:"Buyer geography gate"},
@@ -1586,9 +1581,10 @@ function l4CheckExpiry(){
     const L=LISTINGS[k];
     if(L.state==="LIVE"&&L.endsAt&&Date.now()>L.endsAt){
       if(L.type==="ENG"||L.type==="SEALED"||L.type==="REV"){
-        const dur=L.__loopDurationMs||45*6e4;
+        const nextClose=l4NextAuctionCloseLT().getTime();
         L.state=L.__initialState||"LIVE";
-        L.endsAt=Date.now()+dur;
+        L.endsAt=nextClose;
+        L.ends=fmtEAT(new Date(nextClose));
         L.failReason=null;
         changed=true;
         continue;
@@ -1671,6 +1667,60 @@ function l4ListingMarketPriceStrip(L){
 const L4_MARKET_AUCTION_TYPES=["ENG","SEALED","REV"];
 const L4_MARKET_OTHER_TYPES=["IOI","RFQ"];
 let l4AudienceTabByMarket={};
+let L4_FOLLOWS={};
+let L4_NOTIFICATIONS={};
+let L4_NOTIF_BOOTSTRAPPED={};
+function l4ShowFollowerListingPopup(notif){
+  if(!notif||!notif.listingId)return;
+  const listingId=String(notif.listingId);
+  const title=l4HtmlEsc(String(notif.title||"New followers-only auction"));
+  const detail=l4HtmlEsc(String(notif.fromUser?("From "+notif.fromUser):"Marketplace update"));
+  const sheetHtml=getUIDMeta(listingId)||`<div style="font-size:12px;color:var(--tx2)">Listing ${l4HtmlEsc(listingId)} is available.</div>`;
+  document.getElementById("ms-pop-body").innerHTML=`<div style="padding:4px 0 0">
+    <div style="font-size:10px;font-weight:800;letter-spacing:.06em;color:#7C3AED;text-transform:uppercase;margin-bottom:6px">New auction for followers</div>
+    <div style="font-size:16px;font-weight:800;color:#1a1208;margin-bottom:3px">${title}</div>
+    <div style="font-size:11px;color:var(--tx3);margin-bottom:10px">${detail}</div>
+    <div style="max-height:52vh;overflow:auto;padding-right:2px">${sheetHtml}</div>
+    <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:12px;border-top:1px solid #ece1cc;padding-top:10px">
+      <button type="button" onclick="closeMsPop()" style="padding:7px 12px;background:#fff;border:1px solid #d8cdb8;border-radius:5px;font-size:11px;color:#5a4a3a;cursor:pointer">Dismiss</button>
+      <button type="button" onclick="l4OpenMarketplaceListingFromNotif('${listingId}');closeMsPop()" style="padding:7px 12px;background:#7C3AED;border:none;border-radius:5px;font-size:11px;color:#fff;font-weight:700;cursor:pointer">Open auction</button>
+    </div>
+  </div>`;
+  if(typeof msPopOpenAsModal==="function")msPopOpenAsModal();
+}
+function l4HandleIncomingNotifications(next){
+  const user=l4GetCurrentUser();
+  if(!user||!next||typeof next!=="object")return;
+  const prevMap=L4_NOTIFICATIONS&&typeof L4_NOTIFICATIONS==="object"?L4_NOTIFICATIONS:{};
+  const prevList=Array.isArray(prevMap[user])?prevMap[user]:[];
+  const nextList=Array.isArray(next[user])?next[user]:[];
+  if(!L4_NOTIF_BOOTSTRAPPED[user]){
+    L4_NOTIF_BOOTSTRAPPED[user]=true;
+    return;
+  }
+  const prevIds=new Set(prevList.map(function(n){return n&&n.id?String(n.id):"";}));
+  const incoming=nextList.filter(function(n){
+    if(!n||typeof n!=="object")return false;
+    if(n.read)return false;
+    if(n.type!=="new_follower_listing")return false;
+    if(!n.listingId)return false;
+    const nid=n.id?String(n.id):"";
+    return !nid||!prevIds.has(nid);
+  });
+  if(!incoming.length)return;
+  l4ShowFollowerListingPopup(incoming[0]);
+}
+window.__ANKUARU_SET_FOLLOWS=function(next){
+  if(!next||typeof next!=="object"){L4_FOLLOWS={};return;}
+  L4_FOLLOWS=next;
+};
+window.__ANKUARU_SET_NOTIFS=function(next){
+  if(!next||typeof next!=="object"){L4_NOTIFICATIONS={};return;}
+  l4HandleIncomingNotifications(next);
+  L4_NOTIFICATIONS=next;
+  if(typeof updateStatusBar==="function")updateStatusBar();
+  if(typeof notifOpen!=="undefined"&&notifOpen&&typeof renderNotifPanel==="function")renderNotifPanel();
+};
 
 function l4GetCurrentUser(){
   const u=window.__ANKUARU_CURRENT_USER;
@@ -1681,18 +1731,37 @@ function l4IsActiveMarketState(state){
   return state==="LIVE"||state==="ENGAGED";
 }
 
+function l4UserFollowsCreator(user,creator){
+  if(!user||!creator)return false;
+  const follows=L4_FOLLOWS&&typeof L4_FOLLOWS==="object"?L4_FOLLOWS:{};
+  const mine=follows[user];
+  return Array.isArray(mine)&&mine.includes(creator);
+}
+
+function l4CanAccessListing(L,currentUser){
+  if(!L)return false;
+  const audience=L.audience||((Array.isArray(L.visibility)&&L.visibility.includes("Followers only"))?"followers":"open");
+  if(audience!=="followers")return true;
+  if(!currentUser)return false;
+  if(L.creator===currentUser)return true;
+  return l4UserFollowsCreator(currentUser,L.creator);
+}
+
 function l4MarketListingCard(id,L){
   const c=LISTING_STATE_COLOR[L.state]||"#666";
   const isSealed=L.type==="SEALED";
+  const creatorName=L.creator||L.seller||L.buyer||"system";
   const priceLine=L.priceUSDkg?(L.priceUSDkg+" USD/kg"):(isSealed?"<span style=\"color:#666\">Bids hidden</span>":(L.currentUSDkg?("Current "+L.currentUSDkg+" USD/kg"):(L.differential||(L.ceilingUSDkg?("Ceiling "+L.ceilingUSDkg):(L.currentLowUSDkg?("Low "+L.currentLowUSDkg):"—")))));
   const activity=isSealed?(L.sealedBids+" sealed (blind)"):(L.bids!==undefined?(L.bids+" bids"):(L.offers!==undefined?(L.offers+" offers"):"—"));
+  const activityCount=isSealed?(L.sealedBids||L.bidsReceived||0):(L.bids!==undefined?(L.bids||0):(L.offers!==undefined?(L.offers||0):0));
+  const activityLabel=isSealed?"Sealed bids":(L.bids!==undefined?"Bids":"Offers");
   const action=L.type==="REV"||L.type==="RFQ"?"Submit Offer":(L.type==="IOI"?"Express Interest":"Place Bid");
   const counter=L.lot?("Lot "+L.lot+(L.lot&&CONTAINERS.find(x=>x.exp===L.lot||x.id===L.lot)?' <span style="background:#7C3AED;color:#fff;padding:1px 6px;border-radius:8px;font-size:8px;font-weight:700;letter-spacing:.05em;margin-left:4px">LISTED</span>':"")):(L.buyerCompany||"Buyer-side spec");
   const showTimerCard=!!L.endsAt&&(L.state==="LIVE"||L.state==="ENGAGED")&&(L.type==="ENG"||L.type==="SEALED"||L.type==="REV");
   const priceStripHtml=l4ListingMarketPriceStrip(L);
   const showPriceStrip=showTimerCard&&priceStripHtml;
   const cdEyebrow=L.type==="SEALED"?"Sealed auction":L.type==="ENG"?"Auction":L.type==="REV"?"Reverse auction":L.type==="RFQ"?"Request for quotes":L.type==="IOI"?"Indication of interest":"Closing window";
-  const countdownBand=showTimerCard?`<div class="l4-card-countdown" role="timer" aria-live="polite"><div class="l4-card-countdown__eyebrow">${cdEyebrow} · closes in</div><div class="l4-card-countdown__value"><span class="l4-timer" data-l4-timer="${L.endsAt}">${l4FmtTimer(L.endsAt-Date.now())}</span></div><div class="l4-card-countdown__sub">Demo clock${L.ends?" · "+L.ends:""}</div>${priceStripHtml}</div>`:"";
+  const countdownBand=showTimerCard?`<div class="l4-card-countdown" role="timer" aria-live="polite"><div class="l4-card-countdown__eyebrow">${cdEyebrow} · closes in</div><div class="l4-card-countdown__value"><span class="l4-timer" data-l4-timer="${L.endsAt}">${l4FmtTimer(L.endsAt-Date.now())}</span></div><div class="l4-card-countdown__sub">Scheduled close${L.ends?" · "+L.ends:""}</div>${priceStripHtml}</div>`:"";
   const metaLine=showTimerCard?`<div class="l4-card-meta">${L.eudr?"<b class=\"l4-card-meta__eudr\">EUDR ✓</b> · ":""}<span class="l4-card-meta__vis">${L.visibility.join(" · ")}</span></div>`:`<div style="font-size:10px;color:var(--tx3);margin-top:3px">Closes ${L.ends||"—"} · ${L.eudr?"EUDR ✓ · ":""}${L.visibility.join(" + ")}</div>`;
   const rowPriceSpan=showPriceStrip?"":`<span class="cc-eta">${priceLine}</span>`;
   return`<div class="cc l4-listing-card" style="border-left:3px solid #7C3AED">
@@ -1700,6 +1769,10 @@ function l4MarketListingCard(id,L){
       ${countdownBand}
       <div class="cc-mid">
         <div class="cc-grade">${L.productName||L.grade}</div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px;gap:8px">
+          <div style="font-size:12px;font-weight:800;color:#1a1208">Creator: ${l4HtmlEsc(String(creatorName))}</div>
+          <div style="display:flex;align-items:baseline;gap:6px;background:rgba(124,58,237,.08);border:1px solid #d9c8f8;border-radius:12px;padding:3px 8px"><span style="font-size:9px;font-weight:800;color:#5b21b6;text-transform:uppercase;letter-spacing:.05em">${activityLabel}</span><span style="font-size:18px;line-height:1;font-weight:900;color:#5b21b6">${activityCount}</span></div>
+        </div>
         <div class="cc-row"><span class="cc-w">${(L.weight/1000).toFixed(1)}t</span>${rowPriceSpan}${L.quality?`<span class="cc-sca">${L.quality}</span>`:""}</div>
         <div style="font-size:10px;color:var(--tx3);margin-top:6px">${L.category||"—"} · ${counter} · ${activity}</div>${L.failReason?`<div style="font-size:10px;color:#c44;margin-top:3px;font-weight:600">⚠ ${L.failReason}</div>`:""}
         ${metaLine}
@@ -1712,52 +1785,423 @@ function l4MarketListingCard(id,L){
       </div>
     </div>`;
 }
-function l4MarketColumn(mechId,liveListings){
-  const mech=L4_MECH.find(m=>m.id===mechId);
-  const label=mech?mech.label:mechId;
-  const cards=liveListings.filter(([,L])=>L.type===mechId).map(([id,L])=>l4MarketListingCard(id,L));
-  const stack=cards.length?cards.join(""):`<div class="l4-cat-empty">No listings in this category.</div>`;
-  return`<div class="l4-cat-col"><div class="l4-cat-stack">${stack}</div></div>`;
+function l4MarketSubtypeChip(active,onClick,label){
+  return`<button type="button" onclick="${onClick}" style="padding:6px 12px;border-radius:14px;border:1px solid ${active?"#7C3AED":"#d8cdb8"};background:${active?"rgba(124,58,237,.12)":"#fff"};color:${active?"#5b21b6":"#5a4a3a"};font-size:11px;font-weight:700;cursor:pointer">${label}</button>`;
+}
+function l4SetAuctionSubfilter(v){
+  if(typeof window!=="undefined")window.__ANKUARU_AUCTION_SUBFILTER=v;
+  if(typeof renderMarket==="function")renderMarket();
+}
+function l4SetIoiRfqSubfilter(v){
+  if(typeof window!=="undefined")window.__ANKUARU_IOI_RFQ_SUBFILTER=v;
+  if(typeof renderMarket==="function")renderMarket();
+}
+function l4SetTxnKpiFilter(v){
+  if(typeof window!=="undefined")window.__ANKUARU_TXN_KPI_FILTER=v;
+  if(typeof renderMarket==="function")renderMarket();
+}
+function l4FilteredAuctionEntries(liveListings){
+  const f=(typeof window!=="undefined"&&window.__ANKUARU_AUCTION_SUBFILTER)||"all";
+  return liveListings.filter(function(entry){
+    const L=entry[1];
+    if(L4_MARKET_AUCTION_TYPES.indexOf(L.type)<0)return false;
+    if(f==="all")return true;
+    return L.type===f;
+  });
+}
+function l4FilteredIoiRfqEntries(liveListings){
+  const f=(typeof window!=="undefined"&&window.__ANKUARU_IOI_RFQ_SUBFILTER)||"all";
+  return liveListings.filter(function(entry){
+    const L=entry[1];
+    if(L4_MARKET_OTHER_TYPES.indexOf(L.type)<0)return false;
+    if(f==="all")return true;
+    return L.type===f;
+  });
+}
+function l4MarketListFromEntries(entries){
+  const cards=entries.map(function(e){return l4MarketListingCard(e[0],e[1]);});
+  const inner=cards.length?cards.join(""):"<div class=\"l4-cat-empty\">No listings match this filter.</div>";
+  return`<div class="l4-cat-col"><div class="l4-cat-stack">${inner}</div></div>`;
 }
 
+/* Marketplace-only: import users and offers from data export (API). */
+function l4HtmlEsc(s){
+  if(s==null||s==="")return"";
+  return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;");
+}
+function l4IsUserVerified(u){
+  if(!u||typeof u!=="object")return false;
+  var v=u.is_verified;
+  if(v===true||v===1)return true;
+  if(v==="1"||String(v).toLowerCase()==="true")return true;
+  return false;
+}
+/** First non-empty string from user record (snake/camel variants). */
+function l4ActorField(u){
+  for(var i=1;i<arguments.length;i++){
+    var k=arguments[i];
+    if(k==null)continue;
+    var x=u[k];
+    if(x==null)continue;
+    var s=typeof x==="object"?JSON.stringify(x):String(x);
+    if(s.trim()!=="")return s;
+  }
+  return "";
+}
+function l4ActorFmt(v){
+  if(v==null||v==="")return"—";
+  return l4HtmlEsc(typeof v==="object"&&v!==null?JSON.stringify(v):String(v));
+}
+function l4ActorKeyRowHtml(label,val,last){
+  var b=last?"":"border-bottom:1px solid #e8dfd0;";
+  return'<div style="display:grid;grid-template-columns:minmax(0,38%) 1fr;gap:8px 12px;align-items:baseline;padding:8px 0;'+b+'"><span style="font-size:10px;font-weight:700;color:#5a4d42;text-transform:uppercase;letter-spacing:.03em">'+label+"</span><span style=\"font-size:13px;font-weight:600;color:#1a1208;word-break:break-word;line-height:1.35\">"+l4ActorFmt(val)+"</span></div>";
+}
+/** Hide Auctions/IOI/RFQ/All sub-toolbar when not on Marketplace Home (persists in DOM from prior visit). */
+function l4SyncMarketplaceSubToolbar(){
+  var msec=activeRibbon==="actors"?"actors":activeRibbon==="transactions"?"transactions":"home";
+  var onHome=typeof viewMode!=="undefined"&&viewMode==="market"&&msec==="home";
+  var el=document.getElementById("marketplace-toolbar-tabs");
+  if(!el)return;
+  el.style.display=onHome?"":"none";
+}
+function l4SetActorsKpiFilter(v){
+  if(typeof window!=="undefined")window.__ANKUARU_MARKET_USER_FILTER=v;
+  if(typeof renderMarket==="function")renderMarket();
+}
+function l4BuildMarketActorsKpis(){
+  var st=typeof window!=="undefined"?window.__ANKUARU_MARKET_USER_STATS:null;
+  var total= st && typeof st.total === "number" ? st.total : null;
+  var vcnt= st && typeof st.verifiedCount === "number" ? st.verifiedCount : null;
+  var nvcnt= total != null && vcnt != null ? Math.max(total-vcnt,0) : null;
+  var af=(typeof window!=="undefined"&&window.__ANKUARU_MARKET_USER_FILTER)||"all";
+  var tReg= total != null? String(total):"—";
+  var t2= vcnt != null?String(vcnt):"—";
+  return '<div class="l4-mkpis" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin:0 0 14px;max-width:1100px">'+
+    '<button type="button" onclick="l4SetActorsKpiFilter(\'all\')" class="l4-mkpi" style="text-align:left;cursor:pointer;background:'+(af==="all"?'rgba(124,58,237,.08)':'var(--surface)')+';border:1px solid '+(af==="all"?'#7C3AED':'#e0d4c0')+';border-radius:8px;padding:10px 12px;box-shadow:0 1px 3px rgba(0,0,0,.04)"><div style="font-size:9px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--tx3)">Total merchants</div><div style="font-size:20px;font-weight:800;font-family:monospace;color:var(--tx)">9630</div></button>'+
+    '<button type="button" onclick="l4SetActorsKpiFilter(\'registered\')" class="l4-mkpi" style="text-align:left;cursor:pointer;background:'+(af==="registered"?'rgba(124,58,237,.08)':'var(--surface)')+';border:1px solid '+(af==="registered"?'#7C3AED':'#e0d4c0')+';border-radius:8px;padding:10px 12px;box-shadow:0 1px 3px rgba(0,0,0,.04)"><div style="font-size:9px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--tx3)">Registered users</div><div style="font-size:20px;font-weight:800;font-family:monospace;color:var(--tx)">'+tReg+'</div></button>'+
+    '<button type="button" onclick="l4SetActorsKpiFilter(\'verified\')" class="l4-mkpi" style="text-align:left;cursor:pointer;background:'+(af==="verified"?'rgba(61,107,46,.12)':'var(--surface)')+';border:1px solid '+(af==="verified"?'#3d6b2e':'#e0d4c0')+';border-radius:8px;padding:10px 12px;box-shadow:0 1px 3px rgba(0,0,0,.04)"><div style="font-size:9px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--tx3)">Verified</div><div style="font-size:20px;font-weight:800;font-family:monospace;color:#3d6b2e">'+t2+'</div></button>'+
+    '<button type="button" onclick="l4SetActorsKpiFilter(\'other\')" class="l4-mkpi" style="text-align:left;cursor:pointer;background:'+(af==="other"?'rgba(90,80,70,.10)':'var(--surface)')+';border:1px solid '+(af==="other"?'#8a7a6a':'#e0d4c0')+';border-radius:8px;padding:10px 12px;box-shadow:0 1px 3px rgba(0,0,0,.04)"><div style="font-size:9px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--tx3)">Not verified</div><div style="font-size:20px;font-weight:800;font-family:monospace;color:#5c5348">'+(nvcnt != null?String(nvcnt):"—")+'</div></button>'+
+    '</div>';
+}
+function l4BuildMarketTransactionsKpis(){
+  var st=typeof window!=="undefined"?window.__ANKUARU_MARKET_INQ_STATS:null;
+  var all= st && typeof st.total === "number" ? st.total : null;
+  var buy= st && typeof st.buyIoi === "number" ? st.buyIoi : null;
+  var sell= st && typeof st.sellRfq === "number" ? st.sellRfq : null;
+  var tf=(typeof window!=="undefined"&&window.__ANKUARU_TXN_KPI_FILTER)||"all";
+  return '<div class="l4-mkpis" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px;margin:0 0 14px;max-width:1100px">'+
+    '<button type="button" onclick="l4SetTxnKpiFilter(\'all\')" class="l4-mkpi" style="text-align:left;cursor:pointer;background:'+(tf==="all"?'rgba(124,58,237,.08)':'var(--surface)')+';border:1px solid '+(tf==="all"?'#7C3AED':'#e0d4c0')+';border-radius:8px;padding:10px 12px;box-shadow:0 1px 3px rgba(0,0,0,.04)"><div style="font-size:9px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--tx3)">Total offers</div><div style="font-size:20px;font-weight:800;font-family:monospace;color:var(--tx)">'+(all != null?String(all):"—")+'</div></button>'+
+    '<button type="button" onclick="l4SetTxnKpiFilter(\'buy\')" class="l4-mkpi" style="text-align:left;cursor:pointer;background:'+(tf==="buy"?'rgba(30,58,95,.12)':'var(--surface)')+';border:1px solid '+(tf==="buy"?'#1e3a5f':'#e0d4c0')+';border-radius:8px;padding:10px 12px;box-shadow:0 1px 3px rgba(0,0,0,.04)"><div style="font-size:9px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--tx3)">Buy</div><div style="font-size:20px;font-weight:800;font-family:monospace;color:#1e3a5f">'+(buy != null?String(buy):"—")+'</div></button>'+
+    '<button type="button" onclick="l4SetTxnKpiFilter(\'sell\')" class="l4-mkpi" style="text-align:left;cursor:pointer;background:'+(tf==="sell"?'rgba(107,45,18,.10)':'var(--surface)')+';border:1px solid '+(tf==="sell"?'#6b2d12':'#e0d4c0')+';border-radius:8px;padding:10px 12px;box-shadow:0 1px 3px rgba(0,0,0,.04)"><div style="font-size:9px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--tx3)">Sell</div><div style="font-size:20px;font-weight:800;font-family:monospace;color:#6b2d12">'+(sell != null?String(sell):"—")+'</div></button>'+
+    '</div>';
+}
+/** Mirrors app/api/marketplace/ankuaru-dataset classifyInquiry — do not change without updating the API. */
+function l4InquirySide(u){
+  if(!u||typeof u!=="object")return"other";
+  var offerTypeText=(String(u.offer_type||"")+" "+String(u.role||"")+" "+String(u.phone||"")+" "+String(u.status||"")+" "+String(u.season||"")+" "+String(u.business_type||"")).toLowerCase();
+  if(/\bsell\b/.test(offerTypeText))return"sell";
+  if(/\bbuy\b/.test(offerTypeText))return"buy";
+  if(/\bakrabi\b|\bexporter\b/.test(offerTypeText))return"sell";
+  return"buy";
+}
+function l4MktUpdateBodyScrollLock(){
+  var a=document.getElementById("l4-actor-sheet");
+  var i=document.getElementById("l4-inquiry-sheet");
+  var open=Boolean((a&&a.classList.contains("open"))||(i&&i.classList.contains("open")));
+  document.body.style.overflow=open?"hidden":"";
+}
+function l4CloseActorSheet(){
+  var w=document.getElementById("l4-actor-sheet");
+  if(w){w.classList.remove("open");w.setAttribute("aria-hidden","true");}
+  l4MktUpdateBodyScrollLock();
+}
+function l4OpenActorSheet(){
+  l4CloseInquirySheet();
+  var w=document.getElementById("l4-actor-sheet");
+  if(!w)return;
+  w.classList.add("open");
+  w.setAttribute("aria-hidden","false");
+  l4MktUpdateBodyScrollLock();
+}
+function l4CloseInquirySheet(){
+  var w=document.getElementById("l4-inquiry-sheet");
+  if(w){w.classList.remove("open");w.setAttribute("aria-hidden","true");}
+  l4MktUpdateBodyScrollLock();
+}
+function l4OpenInquirySheet(){
+  l4CloseActorSheet();
+  var w=document.getElementById("l4-inquiry-sheet");
+  if(!w)return;
+  w.classList.add("open");
+  w.setAttribute("aria-hidden","false");
+  l4MktUpdateBodyScrollLock();
+}
+function l4MarketplaceStubSplit(){
+  return'<div class="l4-market-split" style="display:none!important" aria-hidden="true"><div class="l4-market-block l4-market-block--secondary"><div class="l4-market-cols l4-market-cols--single"><div class="l4-cat-col"></div></div></div><div class="l4-market-block"><div class="l4-market-cols l4-market-cols--single"><div class="l4-cat-col"></div></div></div></div>';
+}
+function l4MarketStartUsersIfNeeded(){
+  if(typeof viewMode==="undefined"||viewMode!=="market"||activeRibbon!=="actors")return;
+  var S=window.__ANKUARU_MARKET_USERS_LIST;
+  if(S&&S.loadedOnce)return;
+  if(S&&S.loading)return;
+  window.__ANKUARU_MARKET_USERS_LIST={loading:true,items:[],offset:0,total:0,limit:80,loadedOnce:false,error:null};
+  var q=(window.__ANKUARU_MARKET_USER_Q||"").trim();
+  var qs=q?"&q="+encodeURIComponent(q):"";
+  fetch("/api/marketplace/ankuaru-dataset?type=users&limit=80&offset=0"+qs).then(function(r){return r.json();}).then(function(d){
+    if(typeof window!=="undefined"){var m=window.__ANKUARU_MARKET_USER_BYID||{};(d.items||[]).forEach(function(u){if(u.id!=null)m[String(u.id)]=u;});window.__ANKUARU_MARKET_USER_BYID=m;
+      if(d.stats)window.__ANKUARU_MARKET_USER_STATS=d.stats;
+      window.__ANKUARU_MARKET_USERS_LIST={loading:false,items:d.items||[],offset:d.offset||0,total:d.total||0,limit:d.limit||80,loadedOnce:true,error:null};}
+    if(typeof viewMode!=="undefined"&&viewMode==="market"&&typeof renderMarket==="function")renderMarket();
+  }).catch(function(e){
+    if(typeof window!=="undefined")window.__ANKUARU_MARKET_USERS_LIST={loading:false,items:[],error:String((e&&e.message)||e),loadedOnce:true,total:0,offset:0,limit:80};
+    if(typeof viewMode!=="undefined"&&viewMode==="market"&&typeof renderMarket==="function")renderMarket();
+  });
+}
+function l4MarketStartInqIfNeeded(){
+  if(typeof viewMode==="undefined"||viewMode!=="market"||activeRibbon!=="transactions")return;
+  var S=window.__ANKUARU_MARKET_INQ_LIST;
+  if(S&&S.loadedOnce)return;
+  if(S&&S.loading)return;
+  window.__ANKUARU_MARKET_INQ_LIST={loading:true,items:[],offset:0,total:0,limit:40,loadedOnce:false,error:null};
+  var q2=(window.__ANKUARU_MARKET_INQ_Q||"").trim();
+  var qis=q2?"&q="+encodeURIComponent(q2):"";
+  var user=l4GetCurrentUser()||"";
+  var uqs=user?"&user="+encodeURIComponent(user):"";
+  fetch("/api/marketplace/ankuaru-dataset?type=inquiries&limit=40&offset=0"+uqs+qis).then(function(r){return r.json();}).then(function(d){
+    if(typeof window!=="undefined"){var m2=window.__ANKUARU_MARKET_INQ_BYID||{};(d.items||[]).forEach(function(row){if(row.id!=null)m2[String(row.id)]=row;});window.__ANKUARU_MARKET_INQ_BYID=m2;
+      if(d.stats)window.__ANKUARU_MARKET_INQ_STATS=d.stats;
+      window.__ANKUARU_MARKET_INQ_LIST={loading:false,items:d.items||[],offset:d.offset||0,total:d.total||0,limit:d.limit||40,loadedOnce:true,error:null};}
+    if(typeof viewMode!=="undefined"&&viewMode==="market"&&typeof renderMarket==="function")renderMarket();
+  }).catch(function(e){
+    if(typeof window!=="undefined")window.__ANKUARU_MARKET_INQ_LIST={loading:false,items:[],error:String((e&&e.message)||e),loadedOnce:true,total:0,offset:0,limit:40};
+    if(typeof viewMode!=="undefined"&&viewMode==="market"&&typeof renderMarket==="function")renderMarket();
+  });
+}
+function l4LoadMoreMarketUsers(){
+  const L=window.__ANKUARU_MARKET_USERS_LIST;if(!L||L.loading)return;
+  L.loading=true;renderMarket();
+  var off=(L.items||[]).length;var q=(window.__ANKUARU_MARKET_USER_Q||"").trim();
+  var qs=q?"&q="+encodeURIComponent(q):"";
+  fetch("/api/marketplace/ankuaru-dataset?type=users&limit=80&offset="+off+qs).then(function(r){return r.json();}).then(function(d){
+    if(d.stats)window.__ANKUARU_MARKET_USER_STATS=d.stats;
+    var m=window.__ANKUARU_MARKET_USER_BYID||{};(d.items||[]).forEach(function(u){if(u.id!=null)m[String(u.id)]=u;});window.__ANKUARU_MARKET_USER_BYID=m;
+    L.items=(L.items||[]).concat(d.items||[]);L.offset=0;L.total=d.total||L.total;L.loading=false;window.__ANKUARU_MARKET_USERS_LIST=L;
+    if(viewMode==="market"&&typeof renderMarket==="function")renderMarket();
+  }).catch(function(){L.loading=false;if(viewMode==="market"&&typeof renderMarket==="function")renderMarket();});
+}
+function l4LoadMoreMarketInquiries(){
+  const L=window.__ANKUARU_MARKET_INQ_LIST;if(!L||L.loading)return;
+  L.loading=true;renderMarket();
+  var off=(L.items||[]).length;var q=(window.__ANKUARU_MARKET_INQ_Q||"").trim();
+  var qs=q?"&q="+encodeURIComponent(q):"";
+  var user=l4GetCurrentUser()||"";
+  var uqs=user?"&user="+encodeURIComponent(user):"";
+  fetch("/api/marketplace/ankuaru-dataset?type=inquiries&limit=40&offset="+off+uqs+qs).then(function(r){return r.json();}).then(function(d){
+    if(d.stats)window.__ANKUARU_MARKET_INQ_STATS=d.stats;
+    var m=window.__ANKUARU_MARKET_INQ_BYID||{};(d.items||[]).forEach(function(row){if(row.id!=null)m[String(row.id)]=row;});window.__ANKUARU_MARKET_INQ_BYID=m;
+    L.items=(L.items||[]).concat(d.items||[]);L.total=d.total||L.total;L.loading=false;window.__ANKUARU_MARKET_INQ_LIST=L;
+    if(viewMode==="market"&&typeof renderMarket==="function")renderMarket();
+  }).catch(function(){L.loading=false;if(viewMode==="market"&&typeof renderMarket==="function")renderMarket();});
+}
+function l4RunMarketUserSearch(){
+  if(typeof window!=="undefined"){window.__ANKUARU_MARKET_USER_Q=document.getElementById("l4-market-user-search")?document.getElementById("l4-market-user-search").value:"";
+    window.__ANKUARU_MARKET_USER_BYID={};}
+  window.__ANKUARU_MARKET_USERS_LIST={loading:false,items:[],offset:0,total:0,limit:80,loadedOnce:false,error:null};
+  l4MarketStartUsersIfNeeded();
+}
+function l4RunMarketInqSearch(){
+  if(typeof window!=="undefined"){window.__ANKUARU_MARKET_INQ_Q=document.getElementById("l4-market-inq-search")?document.getElementById("l4-market-inq-search").value:"";
+    window.__ANKUARU_MARKET_INQ_BYID={};}
+  window.__ANKUARU_MARKET_INQ_LIST={loading:false,items:[],offset:0,total:0,limit:40,loadedOnce:false,error:null};
+  l4MarketStartInqIfNeeded();
+}
+function l4ShowMarketUserById(id){
+  const u=(window.__ANKUARU_MARKET_USER_BYID||{})[String(id)];if(!u){toast("User not loaded");return;}
+  const ver=l4IsUserVerified(u);
+  const badge=ver?'<span style="display:inline-block;padding:4px 10px;border-radius:10px;font-size:10px;font-weight:800;letter-spacing:.04em;background:#1f5d2a;color:#fff">Verified</span>':'<span style="display:inline-block;padding:4px 10px;border-radius:10px;font-size:10px;font-weight:800;letter-spacing:.04em;background:#5c5348;color:#fff">Not verified</span>';
+  const kCo=l4ActorField(u,"business_name","businessName");
+  const kPhone=l4ActorField(u,"phone","contact_information","contactInformation");
+  const kCh=l4ActorField(u,"chat_id","chatId");
+  const kEm=l4ActorField(u,"email");
+  const kBt=l4ActorField(u,"business_type","businessType");
+  const keyBlock='<div style="background:#fff;border:1px solid #b8a994;border-radius:8px;padding:2px 14px 4px;margin:0 0 16px;box-shadow:0 1px 3px rgba(0,0,0,.06)"><div style="font-size:9px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#5b21b6;padding:10px 0 4px">Key details</div>'+
+    l4ActorKeyRowHtml("Company",kCo,false)+
+    l4ActorKeyRowHtml("Phone",kPhone,false)+
+    l4ActorKeyRowHtml("Chat ID",kCh,false)+
+    l4ActorKeyRowHtml("Email",kEm,false)+
+    l4ActorKeyRowHtml("Business type",kBt,true)+"</div>";
+  const rows=Object.keys(u).sort().map(function(k){
+    const v=u[k];
+    return"<tr><td style=\"padding:6px 10px;border:1px solid #c9b8a4;font-size:10px;font-weight:700;vertical-align:top;width:32%;color:#2e261c;background:#efe8de\">"+l4HtmlEsc(k)+"</td><td style=\"padding:6px 10px;border:1px solid #c9b8a4;font-size:11px;word-break:break-word;color:#1a1208;background:#fff\">"+l4ActorFmt(v)+"</td></tr>";
+  }).join("");
+  const b=document.getElementById("l4-actor-sheet-body");
+  if(b){
+    b.innerHTML="<div class=\"l4-actor-detail\" style=\"padding:8px 0 20px;max-width:100%;color:#1a1208\"><div style=\"display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:12px;flex-wrap:wrap\"><div><div style=\"font-size:9px;color:#5b21b6;font-weight:800;letter-spacing:.06em;margin-bottom:2px\">APP USER (DATA EXPORT)</div><div id=\"l4-actor-sheet-title\" style=\"font-size:18px;font-weight:800;color:#1a1208;line-height:1.25\">"+l4HtmlEsc(String(u.name||"—"))+"</div><div style=\"font-size:10px;font-family:ui-monospace,monospace;color:#4a4035;margin-top:4px\">#"+l4HtmlEsc(String(u.id))+"</div></div><div style=\"display:flex;align-items:center;gap:8px;flex-shrink:0\">"+badge+"</div></div>"+keyBlock+"<div style=\"font-size:9px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:#4a4035;margin:0 0 6px\">All fields (raw export)</div><div style=\"max-height:min(46vh,400px);overflow-y:auto;border:1px solid #b8a994;border-radius:6px;background:#fff\"><table style=\"width:100%;border-collapse:collapse\">"+rows+"</table></div><div style=\"margin-top:16px;padding-top:12px;border-top:1px solid #d8cdb8\"><button type=\"button\" onclick=\"l4CloseActorSheet()\" style=\"width:100%;padding:11px 14px;border:1px solid #8a7a68;border-radius:6px;background:#fff;cursor:pointer;font-size:13px;font-weight:700;color:#1a1208\">Done</button></div></div>";
+    l4OpenActorSheet();
+  } else {
+    document.getElementById("ms-pop-body").innerHTML="<div style=\"padding:20px;max-width:640px;max-height:80vh;overflow:auto;color:#1a1208\">"+keyBlock+"<div style=\"font-size:9px;color:#7C3AED;font-weight:700;letter-spacing:.05em;margin-bottom:4px\">APP USER (EXPORT)</div><div style=\"display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px\">"+badge+"</div><div style=\"font-size:16px;font-weight:700;margin-bottom:8px\">User #"+l4HtmlEsc(u.id)+"</div><table style=\"width:100%;border-collapse:collapse\">"+rows+"</table><div style=\"margin-top:14px\"><button type=\"button\" onclick=\"document.getElementById('ms-pop').classList.remove('open')\" style=\"padding:8px 14px;border:1px solid #d8cdb8;border-radius:4px;background:#fff;cursor:pointer;font-size:12px\">Done</button></div></div>";
+    if(typeof msPopOpenAsModal==="function")msPopOpenAsModal();
+  }
+}
+function l4InquiryIntentPill(s){
+  if(s==="buy")return'<span style="font-size:8px;font-weight:800;padding:2px 7px;border-radius:6px;background:rgba(30,58,95,.12);color:#1e3a5f;letter-spacing:.02em">Buy (IOI)</span>';
+  if(s==="sell")return'<span style="font-size:8px;font-weight:800;padding:2px 7px;border-radius:6px;background:rgba(107,45,18,.1);color:#6b2d12;letter-spacing:.02em">Sell (RFQ)</span>';
+  return'<span style="font-size:8px;font-weight:800;padding:2px 7px;border-radius:6px;background:rgba(90,80,70,.1);color:#5c5348;letter-spacing:.02em">Unclassified</span>';
+}
+function l4InquiryIntentHeaderBadge(s){
+  if(s==="buy")return'<span style="display:inline-block;padding:4px 10px;border-radius:10px;font-size:10px;font-weight:800;letter-spacing:.04em;background:#1a3354;color:#fff">Buy (IOI)</span>';
+  if(s==="sell")return'<span style="display:inline-block;padding:4px 10px;border-radius:10px;font-size:10px;font-weight:800;letter-spacing:.04em;background:#7a3818;color:#fff">Sell (RFQ)</span>';
+  return'<span style="display:inline-block;padding:4px 10px;border-radius:10px;font-size:10px;font-weight:800;letter-spacing:.04em;background:#4a4a4a;color:#fff">Unclassified</span>';
+}
+function l4ShowMarketInquiryById(id){
+  const u=(window.__ANKUARU_MARKET_INQ_BYID||{})[String(id)];if(!u){toast("Inquiry not loaded");return;}
+  const side=l4InquirySide(u);
+  const intentLabel=side==="buy"?"Buy (IOI)":side==="sell"?"Sell (RFQ)":"Unclassified";
+  const descBlock=l4HtmlEsc(String(u.description||"")).replace(/\n/g,"<br/>");
+  const kPhone=l4ActorField(u,"phone_number","phone");
+  const kCh=l4ActorField(u,"chat_id","chatId");
+  var kx='<div style="background:#fff;border:1px solid #b8a994;border-radius:8px;padding:2px 14px 4px;margin:0 0 16px;box-shadow:0 1px 3px rgba(0,0,0,.06)"><div style="font-size:9px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#5b21b6;padding:10px 0 4px">Key details</div>'+
+    l4ActorKeyRowHtml("Intent (heuristic)",intentLabel,false)+
+    l4ActorKeyRowHtml("Phone",kPhone,false)+
+    l4ActorKeyRowHtml("Chat ID",kCh,false)+
+    l4ActorKeyRowHtml("Category",u.category||"—",false)+
+    l4ActorKeyRowHtml("Posted",u.createdAt||u.created_at||"—",!u.picture_link);
+  if(u.picture_link)kx+=l4ActorKeyRowHtml("Image link",u.picture_link,true);
+  kx+="</div>";
+  const rows=Object.keys(u).sort().map(function(k){
+    const v=u[k];
+    return"<tr><td style=\"padding:6px 10px;border:1px solid #c9b8a4;font-size:10px;font-weight:700;vertical-align:top;width:32%;color:#2e261c;background:#efe8de\">"+l4HtmlEsc(k)+"</td><td style=\"padding:6px 10px;border:1px solid #c9b8a4;font-size:11px;word-break:break-word;color:#1a1208;background:#fff\">"+l4ActorFmt(v)+"</td></tr>";
+  }).join("");
+  const b=document.getElementById("l4-inquiry-sheet-body");
+  if(b){
+    b.innerHTML="<div class=\"l4-actor-detail\" style=\"padding:8px 0 20px;max-width:100%;color:#1a1208\"><div style=\"display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:12px;flex-wrap:wrap\"><div><div style=\"font-size:9px;color:#5b21b6;font-weight:800;letter-spacing:.06em;margin-bottom:2px\">OFFER (TRANSACTIONS EXPORT)</div><div id=\"l4-inquiry-sheet-title\" style=\"font-size:18px;font-weight:800;color:#1a1208;line-height:1.25\">"+l4HtmlEsc(String(u.user_name||"—"))+"</div><div style=\"font-size:10px;font-family:ui-monospace,monospace;color:#4a4035;margin-top:4px\">#"+l4HtmlEsc(String(u.id))+"</div></div><div style=\"display:flex;align-items:center;gap:8px;flex-shrink:0\">"+l4InquiryIntentHeaderBadge(side)+"</div></div>"+kx+"<div style=\"font-size:10px;font-weight:700;color:#1a1208;margin:0 0 6px\">Message</div><div style=\"font-size:12px;line-height:1.5;margin-bottom:14px;padding:10px 12px;border:1px solid #c9b8a4;border-radius:6px;background:#fbf8f2;color:#1a1208\">"+descBlock+"</div><div style=\"font-size:9px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:#4a4035;margin:0 0 6px\">All fields (raw export)</div><div style=\"max-height:min(40vh,360px);overflow-y:auto;border:1px solid #b8a994;border-radius:6px;background:#fff\"><table style=\"width:100%;border-collapse:collapse\">"+rows+"</table></div><div style=\"margin-top:16px;padding-top:12px;border-top:1px solid #d8cdb8\"><button type=\"button\" onclick=\"l4CloseInquirySheet()\" style=\"width:100%;padding:11px 14px;border:1px solid #8a7a68;border-radius:6px;background:#fff;cursor:pointer;font-size:13px;font-weight:700;color:#1a1208\">Done</button></div></div>";
+    l4OpenInquirySheet();
+  } else {
+    document.getElementById("ms-pop-body").innerHTML="<div style=\"padding:20px;max-width:560px;max-height:80vh;overflow:auto;color:#1a1208\">"+kx+"<div style=\"font-size:9px;color:#7C3AED;font-weight:700\">LEGACY INQUIRY</div><div style=\"font-size:15px;font-weight:700\">"+l4HtmlEsc(String(u.user_name||"—"))+"</div><div style=\"font-size:11px;line-height:1.4;margin:8px 0\">"+descBlock+"</div><div style=\"margin-top:12px\"><button type=\"button\" onclick=\"document.getElementById('ms-pop').classList.remove('open')\" style=\"padding:8px 14px\">Done</button></div></div>";
+    if(typeof msPopOpenAsModal==="function")msPopOpenAsModal();
+  }
+}
+function l4BuildMarketUsersHtml(){
+  const S=window.__ANKUARU_MARKET_USERS_LIST;
+  if(!S||S.loading&&!(S.items&&S.items.length))return'<div class="l4-cat-empty">Loading app users from export…</div>';
+  if(S.error)return'<div class="l4-cat-empty">'+l4HtmlEsc(S.error)+"</div>";
+  const af=(typeof window!=="undefined"&&window.__ANKUARU_MARKET_USER_FILTER)||"all";
+  const its=(S.items||[]).filter(function(u){
+    const ver=l4IsUserVerified(u);
+    if(af==="verified")return ver;
+    if(af==="other")return !ver;
+    return true; // all / registered
+  });
+  if(!its.length)return'<div class="l4-cat-empty">No users in this filter.</div>';
+  const more=its.length<(S.total||0);
+  return'<div class="l4-market-cols l4-market-cols--single"><div class="l4-cat-col"><div class="l4-cat-stack" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,300px),1fr));">'+its.map(function(u){
+    const n=l4HtmlEsc(String(u.name||"—"));
+    const verOk=l4IsUserVerified(u);
+    const pill=verOk?'<span style="font-size:8px;font-weight:800;padding:2px 7px;border-radius:6px;background:rgba(31,93,42,.14);color:#1f5d2a;letter-spacing:.02em">Verified</span>':'<span style="font-size:8px;font-weight:800;padding:2px 7px;border-radius:6px;background:rgba(90,80,70,.1);color:#5c5348;letter-spacing:.02em">Not verified</span>';
+    return'<div class="bs-rec-item" style="cursor:pointer;color:#1a1208" onclick="l4ShowMarketUserById('+(u.id==null?0:u.id)+')"><div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:10px;font-family:monospace;color:var(--tx2)">#'+l4HtmlEsc(String(u.id))+"</span>"+pill+"</div><div style=\"font-size:14px;font-weight:600;margin-top:4px;color:#1a1208\">"+n+"</div><div style=\"font-size:10px;color:var(--tx2);margin-top:2px\">"+l4HtmlEsc(String(u.business_type||""))+" · "+l4HtmlEsc(String(u.contact_information||"—"))+"</div><div style=\"font-size:9px;color:var(--tx3);margin-top:4px\">"+l4HtmlEsc(String(u.createdAt||""))+"</div></div>";
+  }).join("")+"</div></div></div>"+(more?'<div style="margin-top:12px;text-align:center"><button type="button" onclick="l4LoadMoreMarketUsers()" class="l4-market-loadmore" '+(S.loading?"disabled":"")+">Load more</button></div>":"")+(S.loading&&its.length?"<div class=\"l4-cat-empty\" style=\"border:none\">Loading more…</div>":"");
+}
+function l4BuildMarketInquiriesHtml(){
+  const S=window.__ANKUARU_MARKET_INQ_LIST;
+  if(!S||S.loading&&!(S.items&&S.items.length))return'<div class="l4-cat-empty">Loading offers…</div>';
+  if(S.error)return'<div class="l4-cat-empty">'+l4HtmlEsc(S.error)+"</div>";
+  const sf=(typeof window!=="undefined"&&window.__ANKUARU_TXN_KPI_FILTER)||"all";
+  const its=(S.items||[]).filter(function(u){
+    const side=l4InquirySide(u);
+    if(sf==="all")return true;
+    if(sf==="buy")return side==="buy";
+    if(sf==="sell")return side==="sell";
+    return true;
+  });
+  if(!its.length)return'<div class="l4-cat-empty">No offers in this filter.</div>';
+  const more=its.length<(S.total||0);
+  return '<div class="l4-market-cols l4-market-cols--single"><div class="l4-cat-col"><div class="l4-cat-stack" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,300px),1fr));">'+its.map(function(u){
+    const t=(u.user_name||"Inquiry");
+    const intP=l4InquiryIntentPill(l4InquirySide(u));
+    return'<div class="bs-rec-item" style="cursor:pointer;color:#1a1208" onclick="l4ShowMarketInquiryById('+(u.id==null?0:u.id)+')"><div style="display:flex;justify-content:space-between;align-items:center;gap:6px;flex-wrap:wrap">'+intP+"<span style=\"font-size:9px;font-family:monospace;color:var(--tx2)\">#"+l4HtmlEsc(String(u.id))+"</span></div><div style=\"font-size:14px;font-weight:600;margin:6px 0 2px;color:#1a1208\">"+l4HtmlEsc(String(t))+"</div><div style=\"font-size:10px;color:var(--tx2);max-height:2.4em;overflow:hidden\">"+l4HtmlEsc(String((u.description||"").replace(/\s+/g," ")).slice(0,120))+"…</div><div style=\"font-size:9px;color:var(--tx3);margin-top:4px\">"+l4HtmlEsc(String(u.createdAt||""))+"</div></div>";
+  }).join("")+"</div></div></div>"+(more?'<div style="margin-top:12px;text-align:center"><button type="button" onclick="l4LoadMoreMarketInquiries()" class="l4-market-loadmore" '+(S.loading?"disabled":"")+">Load more</button></div>":"")+(S.loading&&its.length?"<div class=\"l4-cat-empty\" style=\"border:none\">Loading more…</div>":"");
+}
+function l4BuildMarketFollowersHtml(){
+  const currentUser=l4GetCurrentUser();
+  if(!currentUser)return'<div class="l4-cat-empty">Sign in to view followers.</div>';
+  const follows=L4_FOLLOWS&&typeof L4_FOLLOWS==="object"?L4_FOLLOWS:{};
+  const followers=Object.keys(follows).filter(function(user){
+    const arr=follows[user];
+    return Array.isArray(arr)&&arr.includes(currentUser);
+  });
+  if(!followers.length)return'<div class="l4-cat-empty">No followers yet for '+l4HtmlEsc(currentUser)+'.</div>';
+  return '<div class="l4-market-cols l4-market-cols--single"><div class="l4-cat-col"><div class="l4-cat-stack" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,280px),1fr));">'+followers.map(function(name){
+    return '<div class="bs-rec-item" style="color:#1a1208"><div style="font-size:9px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--tx3)">Follower</div><div style="font-size:15px;font-weight:700;margin-top:6px">'+l4HtmlEsc(String(name))+'</div><div style="font-size:10px;color:var(--tx2);margin-top:5px">Following '+l4HtmlEsc(currentUser)+'</div></div>';
+  }).join("")+'</div></div></div>';
+}
 function renderMarket(){
-  const allListings=Object.entries(LISTINGS);
-  const marketTab=window.__ANKUARU_MARKET_TAB||"ioi-rfq";
+  if(activeRibbon!=="actors"||viewMode!=="market")l4CloseActorSheet();
+  if(activeRibbon!=="transactions"||viewMode!=="market")l4CloseInquirySheet();
+  l4MarketStartUsersIfNeeded();
+  l4MarketStartInqIfNeeded();
+  var msec=activeRibbon==="actors"?"actors":activeRibbon==="transactions"?"transactions":activeRibbon==="followers"?"followers":"home";
+  const allListings=Object.entries(LISTINGS).sort(function(a,b){
+    const aT=Number(a[1]&&a[1].createdAt||0);
+    const bT=Number(b[1]&&b[1].createdAt||0);
+    return bT-aT;
+  });
+  const marketTab=window.__ANKUARU_MARKET_TAB||"auctions";
   const audience=l4AudienceTabByMarket[marketTab]||"public";
   const currentUser=l4GetCurrentUser();
-  const liveListings=allListings.filter(([,L])=>audience==="public"||!currentUser?true:L.creator===currentUser);
-  const tiles=L4_MECH.map(m=>{const n=liveListings.filter(([,L])=>L.type===m.id&&L.state!=="WITHDRAWN").length;return`<div style="background:#fff;border:1px solid #e5dccc;border-radius:6px;padding:12px;text-align:center"><div style="font-size:9px;color:var(--tx3);text-transform:uppercase;letter-spacing:.08em">${m.label}</div><div style="font-size:24px;font-weight:700;color:#7C3AED;margin-top:2px">${n}</div><div style="font-size:10px;color:var(--tx3)">listings</div></div>`;}).join("");
-  const auctionCols=L4_MARKET_AUCTION_TYPES.map(t=>l4MarketColumn(t,liveListings)).join("");
-  const otherCols=L4_MARKET_OTHER_TYPES.map(t=>l4MarketColumn(t,liveListings)).join("");
-  document.getElementById("view-area").innerHTML=`<div style="padding:0 4px 16px">
-    <div style="display:flex;justify-content:flex-end;align-items:center;margin-bottom:12px">
-      <button onclick="openListingWizard()" style="padding:10px 18px;background:#7C3AED;color:#fff;border:none;border-radius:5px;font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 2px 6px rgba(124,58,237,.3)">+ New Listing</button>
-    </div>
-    <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:14px">${tiles}</div>
-    <div style="display:flex;justify-content:flex-start;gap:8px;margin:4px 0 12px">
-      <button onclick="l4SetAudienceTab('public')" style="padding:6px 12px;border-radius:14px;border:1px solid ${audience==="public"?"#7C3AED":"#d8cdb8"};background:${audience==="public"?"rgba(124,58,237,.12)":"#fff"};color:${audience==="public"?"#5b21b6":"#5a4a3a"};font-size:11px;font-weight:700;cursor:pointer">Public Listings</button>
-      <button onclick="l4SetAudienceTab('mine')" style="padding:6px 12px;border-radius:14px;border:1px solid ${audience==="mine"?"#7C3AED":"#d8cdb8"};background:${audience==="mine"?"rgba(124,58,237,.12)":"#fff"};color:${audience==="mine"?"#5b21b6":"#5a4a3a"};font-size:11px;font-weight:700;cursor:pointer">My Listings${currentUser?` · ${currentUser}`:""}</button>
-    </div>
-    <div class="l4-market-split">
-      <div class="l4-market-block">
-        <div class="l4-market-cols l4-market-cols--3">${auctionCols}</div>
-      </div>
-      <div class="l4-market-block l4-market-block--secondary">
-        <div class="l4-market-cols l4-market-cols--2">${otherCols}</div>
-      </div>
-    </div>
+  const liveListings=allListings.filter(([,L])=>{
+    if(audience==="mine")return !!currentUser&&L.creator===currentUser;
+    return l4CanAccessListing(L,currentUser);
+  });
+  const af=(typeof window!=="undefined"&&window.__ANKUARU_AUCTION_SUBFILTER)||"all";
+  const iq=(typeof window!=="undefined"&&window.__ANKUARU_IOI_RFQ_SUBFILTER)||"all";
+  const auctionEntries=l4FilteredAuctionEntries(liveListings);
+  const ioiEntries=l4FilteredIoiRfqEntries(liveListings);
+  const auctionListHtml=l4MarketListFromEntries(auctionEntries);
+  const ioiListHtml=l4MarketListFromEntries(ioiEntries);
+  const ioiFilterBar=`<div style="display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin:0 0 12px">
+    <span style="font-size:10px;font-weight:700;color:var(--tx3);letter-spacing:.06em;text-transform:uppercase">IOI / RFQ</span>
+    ${l4MarketSubtypeChip(iq==="IOI","l4SetIoiRfqSubfilter('IOI')","IOI")}
+    ${l4MarketSubtypeChip(iq==="RFQ","l4SetIoiRfqSubfilter('RFQ')","RFQ")}
+    ${l4MarketSubtypeChip(iq==="all","l4SetIoiRfqSubfilter('all')","All")}
   </div>`;
+  const auctionFilterBar=`<div style="display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin:0 0 12px">
+    <span style="font-size:10px;font-weight:700;color:var(--tx3);letter-spacing:.06em;text-transform:uppercase">Auctions</span>
+    ${l4MarketSubtypeChip(af==="ENG","l4SetAuctionSubfilter('ENG')","Auction")}
+    ${l4MarketSubtypeChip(af==="REV","l4SetAuctionSubfilter('REV')","Reverse auction")}
+    ${l4MarketSubtypeChip(af==="SEALED","l4SetAuctionSubfilter('SEALED')","Sealed bid")}
+    ${l4MarketSubtypeChip(af==="all","l4SetAuctionSubfilter('all')","All")}
+  </div>`;
+  const stub=msec!=="home"?l4MarketplaceStubSplit():"";
+  const userSearch='<div style="font-size:10px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--tx2);margin:0 0 8px">App users (export)</div><div class="l4-msearch" style="display:flex;flex-wrap:wrap;gap:8px;margin:0 0 12px;align-items:center"><input id="l4-market-user-search" type="search" placeholder="Search name, phone…" class="l4-msearch__input" value="'+(window.__ANKUARU_MARKET_USER_Q?l4HtmlEsc(window.__ANKUARU_MARKET_USER_Q):'')+'" /><button type="button" class="l4-msearch__btn" onclick="l4RunMarketUserSearch()">Search</button></div>';
+  const inqSearch='<div style="font-size:10px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--tx2);margin:0 0 8px">Transactions · offers export</div><div class="l4-msearch" style="display:flex;flex-wrap:wrap;gap:8px;margin:0 0 12px;align-items:center"><input id="l4-market-inq-search" type="search" placeholder="Filter text…" class="l4-msearch__input" value="'+(window.__ANKUARU_MARKET_INQ_Q?l4HtmlEsc(window.__ANKUARU_MARKET_INQ_Q):'')+'" /><button type="button" class="l4-msearch__btn" onclick="l4RunMarketInqSearch()">Search</button></div>';
+  const pub=audience==="public";
+  const mine=audience==="mine";
+  const listBlock=msec==="home"?(function(){
+    return'<div class="l4-mv-listings"><div style="display:flex;justify-content:flex-start;gap:8px;margin:4px 0 12px">'+
+      '<button type="button" onclick="l4SetAudienceTab(\'public\')" style="padding:6px 12px;border-radius:14px;border:1px solid '+(pub?"#7C3AED":"#d8cdb8")+";background:"+(pub?"rgba(124,58,237,.12)":"#fff")+";color:"+(pub?"#5b21b6":"#5a4a3a")+';font-size:11px;font-weight:700;cursor:pointer">Listings</button>'+
+      '<button type="button" onclick="l4SetAudienceTab(\'mine\')" style="padding:6px 12px;border-radius:14px;border:1px solid '+(mine?"#7C3AED":"#d8cdb8")+";background:"+(mine?"rgba(124,58,237,.12)":"#fff")+";color:"+(mine?"#5b21b6":"#5a4a3a")+";font-size:11px;font-weight:700;cursor:pointer\">My Listings"+(currentUser?" \u00b7 "+currentUser:"")+"</button></div><div class=\"l4-market-split\">"+
+      '<div class="l4-market-block l4-market-block--secondary">'+ioiFilterBar+'<div class="l4-market-cols l4-market-cols--single">'+ioiListHtml+"</div></div>"+
+      '<div class="l4-market-block">'+auctionFilterBar+'<div class="l4-market-cols l4-market-cols--single">'+auctionListHtml+"</div></div></div></div>";
+  }()):"";
+  const usersBlock=msec==="actors"?("<div class=\"l4-mv-dataset\" style=\"margin-top:2px\">"+l4BuildMarketActorsKpis()+userSearch+l4BuildMarketUsersHtml()+"</div>"):"";
+  const inqBlock=msec==="transactions"?("<div class=\"l4-mv-dataset\" style=\"margin-top:2px\">"+l4BuildMarketTransactionsKpis()+inqSearch+l4BuildMarketInquiriesHtml()+"</div>"):"";
+  const followersBlock=msec==="followers"?("<div class=\"l4-mv-dataset\" style=\"margin-top:2px\"><div style=\"font-size:10px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--tx2);margin:0 0 10px\">Followers for current user</div>"+l4BuildMarketFollowersHtml()+"</div>"):"";
+  document.getElementById("view-area").innerHTML="<div class=\"l4-mv4-root\" style=\"padding:0 4px 88px;position:relative\">"+stub+listBlock+usersBlock+inqBlock+"</div>";
+  if(followersBlock){
+    document.getElementById("view-area").innerHTML="<div class=\"l4-mv4-root\" style=\"padding:0 4px 88px;position:relative\">"+stub+followersBlock+"</div>";
+  }
   l4StartTimers();
+  l4SyncMarketplaceSubToolbar();
 }
 
 function l4SetAudienceTab(tab){
-  const marketTab=window.__ANKUARU_MARKET_TAB||"ioi-rfq";
+  const marketTab=window.__ANKUARU_MARKET_TAB||"auctions";
   l4AudienceTabByMarket[marketTab]=tab==="mine"?"mine":"public";
   renderMarket();
 }
 
 function l4Withdraw(id){const L=LISTINGS[id];if(!L)return;const hasActivity=(L.bids||0)+(L.offers||0)+(L.bidsReceived||0)+(L.engaged||0)>0;if(hasActivity){if(!confirm("This listing has engagement. Withdrawal post-engagement requires admin review and may incur a reputation penalty. Continue?"))return;L.state="WITHDRAWN";toast(id+" withdrawn · admin review pending");}else{L.state="WITHDRAWN";toast(id+" withdrawn");}if(L.lot){const c=CONTAINERS.find(x=>x.id===L.lot||x.exp===L.lot);if(c)delete c.listed;}persistMarketplaceListings();renderMarket();}
-function l4Relist(id){const L=LISTINGS[id];if(!L)return;L.state="LIVE";L.endsAt=Date.now()+24*36e5;L.failReason=null;L.bids=0;L.offers=0;L.bidsReceived=0;L.engaged=0;if(L.bidHistory)L.bidHistory=[];if(L.lot){const c=CONTAINERS.find(x=>x.id===L.lot||x.exp===L.lot);if(c)c.listed=id;}toast(id+" re-listed · 24h window");persistMarketplaceListings();renderMarket();}
+function l4Relist(id){const L=LISTINGS[id];if(!L)return;L.state="LIVE";if(L.type==="ENG"||L.type==="SEALED"||L.type==="REV"){const closeAt=l4NextAuctionCloseLT().getTime();L.endsAt=closeAt;L.ends=fmtEAT(new Date(closeAt));}else{L.endsAt=Date.now()+24*36e5;}L.failReason=null;L.bids=0;L.offers=0;L.bidsReceived=0;L.engaged=0;if(L.bidHistory)L.bidHistory=[];if(L.lot){const c=CONTAINERS.find(x=>x.id===L.lot||x.exp===L.lot);if(c)c.listed=id;}toast(id+" re-listed");persistMarketplaceListings();renderMarket();}
 
 function l4GenEUDRReport(containerId){
   const c=CONTAINERS.find(x=>x.id===containerId);if(!c)return;
@@ -1819,10 +2263,13 @@ function l4ShowBidHistory(id){
 function l4PlaceBid(id){
   const L=LISTINGS[id];if(!L)return;
   if(L.state!=="LIVE"&&L.state!=="ENGAGED"){toast("Listing is "+L.state);return;}
+  const bidder=l4GetCurrentUser()||"anonymous";
+  if(!l4CanAccessListing(L,bidder)){toast("You do not have access to this listing.");return;}
+  if(L.creator&&bidder===L.creator){toast("You cannot bid on your own listing.");return;}
   if(L.type==="IOI"){toast("Interest expressed on "+id);L.engaged=(L.engaged||0)+1;persistMarketplaceListings();renderMarket();return;}
-  if(L.type==="ENG"&&L.minIncrementUSD){const cur=L.currentUSDkg||L.reserveUSDkg||0;const next=(cur+L.minIncrementUSD).toFixed(2);const v=prompt("Place bid (min "+next+" USD/kg, increment "+L.minIncrementUSD+"):");if(!v)return;const num=parseFloat(v);if(isNaN(num)||num<parseFloat(next)){toast("Bid must be ≥ "+next+" USD/kg");return;}L.currentUSDkg=num;L.bids=(L.bids||0)+1;if(L.bidHistory)L.bidHistory.push({actor:"You",amount:num,when:"just now"});toast("Bid "+num+" placed on "+id);persistMarketplaceListings();renderMarket();return;}
-  // Simulate match for English/Sealed/Reverse/RFQ
-  if(confirm(`Submit bid/offer on ${id}?\n\n${L.grade}\n${(L.weight/1000).toFixed(1)}t · ${L.incoterm||"—"}\n\nThis simulates a successful match → handoff to Contracting.`)){
+  if(L.type==="ENG"&&L.minIncrementUSD){const cur=L.currentUSDkg||L.reserveUSDkg||0;const next=(cur+L.minIncrementUSD).toFixed(2);const v=arguments.length>1?String(arguments[1]):prompt("Place bid (min "+next+" USD/kg, increment "+L.minIncrementUSD+"):");if(v==null||v==="")return;const num=parseFloat(v);if(isNaN(num)||num<parseFloat(next)){toast("Bid must be ≥ "+next+" USD/kg");return;}L.currentUSDkg=num;L.bids=(L.bids||0)+1;if(L.bidHistory)L.bidHistory.push({actor:bidder,amount:num,when:"just now"});toast("Bid "+num+" placed on "+id);persistMarketplaceListings();renderMarket();return;}
+  // Confirm match for English/Sealed/Reverse/RFQ
+  if(confirm(`Submit bid/offer on ${id}?\n\n${L.grade}\n${(L.weight/1000).toFixed(1)}t · ${L.incoterm||"—"}`)){
     L.state="MATCHED";
     const ctrId=ctrCreateFromListing(id);
     toast("Match locked · "+ctrId+" auto-drafted");
@@ -1830,6 +2277,27 @@ function l4PlaceBid(id){
     persistMarketplaceListings();
     renderMarket();
   }
+}
+function l4PlaceBidFromUidInput(id){
+  const inp=document.getElementById("l4-uid-bid-input");
+  const val=inp?String(inp.value||"").trim():"";
+  if(!val){toast("Enter a bid amount first.");return;}
+  l4PlaceBid(id,val);
+}
+function l4InjectQuickBidFromNotification(listingId){
+  const L=LISTINGS[listingId];
+  if(!L||L.state!=="LIVE")return;
+  if(!(L.type==="ENG"||L.type==="REV"||L.type==="SEALED"))return;
+  const pb=document.getElementById("uid-pb");
+  if(!pb||document.getElementById("l4-uid-bid-box"))return;
+  const wrap=document.createElement("div");
+  wrap.id="l4-uid-bid-box";
+  const cur=L.currentUSDkg||L.reserveUSDkg||L.ceilingUSDkg||0;
+  const inc=L.minIncrementUSD||0.05;
+  const suggested=(cur+inc).toFixed(2);
+  wrap.style.cssText="margin-top:12px;padding:10px;background:rgba(124,58,237,.08);border-left:2px solid #7C3AED;border-radius:4px;color:#000";
+  wrap.innerHTML=`<div style="font-size:10px;font-weight:700;color:#000;margin-bottom:6px">Quick bid from notification</div><div style="display:flex;gap:8px;align-items:center"><input id="l4-uid-bid-input" type="number" step="0.01" min="${suggested}" placeholder="Bid (min ${suggested})" style="flex:1;padding:7px 9px;border:1px solid #d8cdb8;border-radius:4px;font-size:12px;color:#000;background:#fff"><button type="button" onclick="l4PlaceBidFromUidInput('${listingId}')" style="padding:7px 12px;background:#7C3AED;color:#fff;border:none;border-radius:4px;font-size:12px;font-weight:700;cursor:pointer">Place Bid</button></div>`;
+  pb.appendChild(wrap);
 }
 
 function l4ShowMatchHandoff(listingId){
@@ -1899,7 +2367,7 @@ function renderL4Step(){
       </div>
       <div style="background:#fff;border:1px solid #e5dccc;border-radius:5px;padding:10px 12px;margin-top:4px">
         <div style="font-size:11px;color:var(--tx2);font-weight:600;margin-bottom:6px">Bidding Window</div>
-        <div style="display:flex;gap:6px;margin-bottom:6px"><button onclick="L4_NEW.customClose=false;L4_NEW.closeAt=todayClose17EAT().getTime();renderL4Step()" style="flex:1;padding:6px;background:${!L4_NEW.customClose?'#7C3AED':'#fff'};color:${!L4_NEW.customClose?'#fff':'var(--tx2)'};border:1px solid ${!L4_NEW.customClose?'#7C3AED':'#d8cdb8'};border-radius:4px;font-size:11px;cursor:pointer">Same-day · closes 17:00 EAT</button><button onclick="L4_NEW.customClose=true;renderL4Step()" style="flex:1;padding:6px;background:${L4_NEW.customClose?'#7C3AED':'#fff'};color:${L4_NEW.customClose?'#fff':'var(--tx2)'};border:1px solid ${L4_NEW.customClose?'#7C3AED':'#d8cdb8'};border-radius:4px;font-size:11px;cursor:pointer">Custom</button></div>
+        <div style="display:flex;gap:6px;margin-bottom:6px"><button onclick="L4_NEW.customClose=false;L4_NEW.closeAt=todayClose17EAT().getTime();renderL4Step()" style="flex:1;padding:6px;background:${!L4_NEW.customClose?'#7C3AED':'#fff'};color:${!L4_NEW.customClose?'#fff':'var(--tx2)'};border:1px solid ${!L4_NEW.customClose?'#7C3AED':'#d8cdb8'};border-radius:4px;font-size:11px;cursor:pointer">Same-day · closes 16:00 LT</button><button onclick="L4_NEW.customClose=true;renderL4Step()" style="flex:1;padding:6px;background:${L4_NEW.customClose?'#7C3AED':'#fff'};color:${L4_NEW.customClose?'#fff':'var(--tx2)'};border:1px solid ${L4_NEW.customClose?'#7C3AED':'#d8cdb8'};border-radius:4px;font-size:11px;cursor:pointer">Custom</button></div>
         ${L4_NEW.customClose?`<input type="datetime-local" oninput="const d=new Date(this.value);L4_NEW.closeAt=d.getTime()-3*36e5;renderL4Step()" style="width:100%;padding:6px;border:1px solid #d8cdb8;border-radius:4px;font-size:11px">`:""}
         <div style="font-size:10px;color:var(--tx3);margin-top:6px">Closes <b style="color:#7C3AED">${closeStr}</b>${sameDay?' · same-day':''}</div>
       </div>
@@ -1970,30 +2438,92 @@ function l4Publish(){
 }
 
 
-// Wizard override (v2) — mechanism -> category -> product -> specs -> review
+// Wizard override (v2) — flow -> mechanism -> category+product (dropdowns) -> specs -> visibility -> review
+/** Demo-friendly defaults so stakeholders can advance with Next without typing. */
+function l4WizardDemoDefaults(){
+  const closeT=todayClose17EAT();
+  return{
+    flow:"auction",
+    mech:"ENG",
+    category:"Coffee",
+    productName:"Export Coffee",
+    region:"Yirgacheffe",
+    grade:"1",
+    process:"washed",
+    vis:["open"],
+    qbind:"info",
+    weight:"12000",
+    price:"4.85",
+    quantityUnit:"KG",
+    currencyCode:"USD",
+    delivery:"at-modjo",
+    customClose:false,
+    closeAt:closeT.getTime(),
+    userPickedCurrency:false,
+    minInc:"0.05",
+    antiSnipe:"5",
+    hardCap:"30"
+  };
+}
 function openListingWizard(){
   l4Step=0;
-  const closeT=todayClose17EAT();
-  L4_NEW={
-    flow:null,mech:null,category:null,productName:null,
-    region:"",grade:"",process:"",
-    vis:["open"],qbind:"info",
-    weight:"",price:"",
-    quantityUnit:"KG",currencyCode:"USD",
-    delivery:"at-modjo",
-    customClose:false,closeAt:closeT.getTime()
-  };
+  L4_NEW=l4WizardDemoDefaults();
   document.getElementById("l4-wiz-ov").classList.add("open");
   renderL4Step();
 }
 function closeL4Wiz(){document.getElementById("l4-wiz-ov").classList.remove("open");}
-function l4Next(){if(l4Step<6){l4Step++;renderL4Step();}else{l4Publish();}}
+function l4Next(){if(l4Step<5){l4Step++;renderL4Step();}else{l4Publish();}}
 function l4Back(){if(l4Step>0){l4Step--;renderL4Step();}}
 function l4Pick(k,v){L4_NEW[k]=v;renderL4Step();}
-function l4ToggleVis(v){const i=L4_NEW.vis.indexOf(v);if(i>=0)L4_NEW.vis.splice(i,1);else L4_NEW.vis.push(v);renderL4Step();}
+function l4ToggleVis(v){
+  const i=L4_NEW.vis.indexOf(v);
+  if(i>=0)L4_NEW.vis.splice(i,1);
+  else{
+    if(v==="followers")L4_NEW.vis=L4_NEW.vis.filter(x=>x!=="open");
+    if(v==="open")L4_NEW.vis=L4_NEW.vis.filter(x=>x!=="followers");
+    L4_NEW.vis.push(v);
+  }
+  renderL4Step();
+}
+
+function l4AudienceFromVisibility(){
+  return (L4_NEW.vis||[]).includes("followers")?"followers":"open";
+}
+
+function l4NotifyFollowersForListing(listingId,creator,label){
+  if(!listingId||!creator)return Promise.resolve(0);
+  return fetch(`/api/marketplace/follows?_=${Date.now()}`,{
+    cache:"no-store",
+    headers:{"Cache-Control":"no-cache",Pragma:"no-cache"}
+  }).then(r=>r.json()).then(payload=>{
+    const follows=payload&&payload.follows&&typeof payload.follows==="object"?payload.follows:{};
+    const followers=Object.keys(follows).filter(u=>Array.isArray(follows[u])&&follows[u].includes(creator));
+    if(!followers.length)return 0;
+    return fetch(`/api/marketplace/notifications?_=${Date.now()}`,{
+      method:"POST",
+      headers:{"Content-Type":"application/json","Cache-Control":"no-cache",Pragma:"no-cache"},
+      cache:"no-store",
+      body:JSON.stringify({
+        action:"append",
+        userIds:followers,
+        payload:{
+          type:"new_follower_listing",
+          listingId,
+          fromUser:creator,
+          title:`${creator} published a followers-only ${label}`,
+          createdAt:new Date().toISOString()
+        }
+      })
+    }).then(rr=>rr.ok?followers.length:0).catch(()=>0);
+  }).catch(()=>0);
+}
+
+function l4WizardSelectAttr(s){
+  return String(s??"").replace(/&/g,"&amp;").replace(/"/g,"&quot;");
+}
 
 function renderL4Step(){
-  const labels=["Flow","Mechanism","Category","Product","Specs & Commercial","Visibility","Review"];
+  const labels=["Flow","Mechanism","Category & product","Specs & Commercial","Visibility","Review"];
   const dots=labels.map((l,i)=>`<div style="display:flex;align-items:center;gap:6px;${i<labels.length-1?'flex:1':''}"><div style="width:22px;height:22px;border-radius:50%;background:${i<=l4Step?'#7C3AED':'#e5dccc'};color:${i<=l4Step?'#fff':'#999'};display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700">${i+1}</div><div style="font-size:10px;color:${i===l4Step?'var(--tx)':'var(--tx3)'};font-weight:${i===l4Step?'600':'400'}">${l}</div>${i<labels.length-1?'<div style="flex:1;height:1px;background:#e5dccc;margin:0 4px"></div>':''}</div>`).join("");
   let body="";
 
@@ -2008,11 +2538,19 @@ function renderL4Step(){
       :[{id:"ENG",label:"Auction",desc:"Ascending bid auction"},{id:"REV",label:"Reverse Auction",desc:"Seller underbids to buyer need"},{id:"SEALED",label:"Sealed Bid Auction",desc:"Blind bid until close"}];
     body=`<div style="display:grid;gap:8px">${opts.map(m=>`<div onclick="l4Pick('mech','${m.id}')" style="padding:14px;border:2px solid ${L4_NEW.mech===m.id?'#7C3AED':'#e5dccc'};border-radius:6px;cursor:pointer;background:${L4_NEW.mech===m.id?'rgba(124,58,237,.06)':'#fff'};color:#1a1208;opacity:1"><div style="font-weight:700;color:#1a1208;opacity:1">${m.label}</div><div style="font-size:11px;color:#3a2a1a;margin-top:2px;opacity:1">${m.desc}</div></div>`).join("")}</div>`;
   }else if(l4Step===2){
-    body=`<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px">${L4_CATEGORIES.map(c=>`<div onclick="L4_NEW.category='${c.replace(/'/g,"\\'")}';L4_NEW.productName='';renderL4Step()" style="padding:10px;border:2px solid ${L4_NEW.category===c?'#7C3AED':'#e5dccc'};border-radius:6px;cursor:pointer;background:${L4_NEW.category===c?'rgba(124,58,237,.06)':'#fff'};font-size:12px;font-weight:600;color:#1a1208;opacity:1">${c}</div>`).join("")}</div>`;
-  }else if(l4Step===3){
     const products=L4_PRODUCTS[L4_NEW.category]||[];
-    body=`<div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px">${products.map(p=>`<div onclick="L4_NEW.productName='${p.replace(/'/g,"\\'")}';renderL4Step()" style="padding:10px;border:2px solid ${L4_NEW.productName===p?'#7C3AED':'#e5dccc'};border-radius:6px;cursor:pointer;background:${L4_NEW.productName===p?'rgba(124,58,237,.06)':'#fff'};font-size:12px;color:#1a1208;opacity:1">${p}</div>`).join("")||'<div style="font-size:11px;color:#3a2a1a">No products configured.</div>'}</div>`;
-  }else if(l4Step===4){
+    const catOpts='<option value="">Select category…</option>'+L4_CATEGORIES.map(c=>`<option value="${l4WizardSelectAttr(c)}" ${L4_NEW.category===c?"selected":""}>${l4HtmlEsc(c)}</option>`).join("");
+    const prodPlace=L4_NEW.category?"Select product…":"Choose a category first";
+    const prodOpts=`<option value="">${prodPlace}</option>`+products.map(p=>`<option value="${l4WizardSelectAttr(p)}" ${L4_NEW.productName===p?"selected":""}>${l4HtmlEsc(p)}</option>`).join("");
+    body=`<div style="display:grid;gap:16px;max-width:440px">
+      <label style="font-size:12px;font-weight:600;color:var(--tx)">Category
+        <select onchange="L4_NEW.category=this.value;L4_NEW.productName='';renderL4Step()" style="width:100%;padding:10px 12px;margin-top:6px;border:1px solid #d8cdb8;border-radius:6px;font-size:13px;color:#1a1208;background:var(--surface);cursor:pointer">${catOpts}</select>
+      </label>
+      <label style="font-size:12px;font-weight:600;color:var(--tx)">Product
+        <select onchange="L4_NEW.productName=this.value;renderL4Step()" ${!L4_NEW.category?'disabled':''} style="width:100%;padding:10px 12px;margin-top:6px;border:1px solid #d8cdb8;border-radius:6px;font-size:13px;color:#1a1208;background:var(--surface);cursor:pointer;${!L4_NEW.category?'opacity:.55':''}">${prodOpts}</select>
+      </label>
+    </div>`;
+  }else if(l4Step===3){
     const units=(L4_CATEGORY_UNITS[L4_NEW.category]||["KG","Ton","FCL"]);
     const coffeeFields=L4_NEW.category==="Coffee"&&L4_NEW.productName==="Export Coffee";
     const sesameFields=L4_NEW.category==="Oil Seeds"&&L4_NEW.productName==="Sesame Seed";
@@ -2032,7 +2570,7 @@ function renderL4Step(){
       ${L4_NEW.customClose?`<input type="datetime-local" value="${l4DateLocalInputValue(L4_NEW.closeAt)}" onchange="const d=new Date(this.value);if(!isNaN(d.getTime()))L4_NEW.closeAt=d.getTime();renderL4Step()" style="width:100%;padding:6px;border:1px solid #d8cdb8;border-radius:4px;font-size:11px">`:""}
       <div style="font-size:10px;color:var(--tx3)">Closes <b style="color:#7C3AED">${l4CloseDisplayText()}</b></div>
     </div>`;
-  }else if(l4Step===5){
+  }else if(l4Step===4){
     const visChips=L4_VIS.map(v=>`<div onclick="l4ToggleVis('${v.id}')" style="padding:10px 12px;border:2px solid ${L4_NEW.vis.includes(v.id)?'#7C3AED':'#e5dccc'};border-radius:5px;cursor:pointer;background:${L4_NEW.vis.includes(v.id)?'rgba(124,58,237,.06)':'#fff'};display:flex;justify-content:space-between;margin-bottom:6px"><div><div style="font-weight:600;font-size:12px">${v.label}</div><div style="font-size:10px;color:var(--tx3)">${v.desc}</div></div><div style="font-size:14px;color:#7C3AED">${L4_NEW.vis.includes(v.id)?'✓':''}</div></div>`).join("");
     body=`<div style="font-size:11px;color:var(--tx2);margin-bottom:10px">Visibility rules for this listing</div>${visChips}`;
   }else{
@@ -2055,7 +2593,7 @@ function renderL4Step(){
   const stepValidation=l4ValidateStep(l4Step);
   const valid=stepValidation.ok;
   const stepHint=!valid?stepValidation.message:"";
-  document.getElementById("l4-wiz-body").innerHTML=`<div style="display:flex;gap:0;margin-bottom:20px">${dots}</div><div style="min-height:240px">${body}</div><div id="l4-wiz-step-error" role="status" style="margin-top:8px;font-size:11px;color:#5a3d1a;font-weight:600;line-height:1.45">${stepHint}</div><div style="display:flex;justify-content:space-between;margin-top:18px;padding-top:14px;border-top:1px solid #e5dccc"><button onclick="closeL4Wiz()" style="padding:8px 16px;background:none;border:none;color:var(--tx3);cursor:pointer;font-size:12px">Cancel</button><div style="display:flex;gap:8px">${l4Step>0?'<button onclick="l4Back()" style="padding:8px 16px;background:#fff;border:1px solid #d8cdb8;border-radius:4px;cursor:pointer;font-size:12px">Back</button>':''}<button id="l4-wiz-next-btn" onclick="l4Next()" ${valid?'':'disabled'} style="padding:8px 20px;background:${valid?'#7C3AED':'#ccc'};color:#fff;border:none;border-radius:4px;cursor:${valid?'pointer':'not-allowed'};font-size:12px;font-weight:700">${l4Step===6?'Submit Listing':'Next →'}</button></div></div>`;
+  document.getElementById("l4-wiz-body").innerHTML=`<div style="display:flex;gap:0;margin-bottom:20px">${dots}</div><div style="min-height:240px">${body}</div><div id="l4-wiz-step-error" role="status" style="margin-top:8px;font-size:11px;color:#5a3d1a;font-weight:600;line-height:1.45">${stepHint}</div><div style="display:flex;justify-content:space-between;margin-top:18px;padding-top:14px;border-top:1px solid #e5dccc"><button onclick="closeL4Wiz()" style="padding:8px 16px;background:none;border:none;color:var(--tx3);cursor:pointer;font-size:12px">Cancel</button><div style="display:flex;gap:8px">${l4Step>0?'<button onclick="l4Back()" style="padding:8px 16px;background:#fff;border:1px solid #d8cdb8;border-radius:4px;cursor:pointer;font-size:12px">Back</button>':''}<button id="l4-wiz-next-btn" onclick="l4Next()" ${valid?'':'disabled'} style="padding:8px 20px;background:${valid?'#7C3AED':'#ccc'};color:#fff;border:none;border-radius:4px;cursor:${valid?'pointer':'not-allowed'};font-size:12px;font-weight:700">${l4Step===5?'Submit Listing':'Next →'}</button></div></div>`;
   l4ApplyHighContrastText();
 }
 
@@ -2069,8 +2607,11 @@ function l4Publish(){
   const newId="LIST-"+idPrefix+"-"+String(Math.floor(Math.random()*9000)+1000);
   const closeAt=L4_NEW.closeAt||todayClose17EAT().getTime();
   const delivery=DELIVERY_LOCATIONS.find(d=>d.id===L4_NEW.delivery);
+  const creator=l4GetCurrentUser()||"system";
+  const audience=l4AudienceFromVisibility();
   const listing={
     type:L4_NEW.mech,state:"LIVE",lot:null,
+    createdAt:Date.now(),
     category:L4_NEW.category,productName:L4_NEW.productName,
     region:L4_NEW.region||null,grade:L4_NEW.grade||L4_NEW.productName,process:L4_NEW.process||null,
     weight:parseInt(L4_NEW.weight)||10000,
@@ -2078,11 +2619,12 @@ function l4Publish(){
     priceUSDkg:parseFloat(L4_NEW.price)||0,
     currencyCode:L4_NEW.currencyCode||"USD",
     quantityUnit:L4_NEW.quantityUnit||"KG",
-    creator:l4GetCurrentUser()||"system",
+    creator,
     delivery:delivery?delivery.label:"—",
     incoterm:delivery?delivery.label:"—",
     endsAt:closeAt,
     ends:fmtEAT(new Date(closeAt)),
+    audience,
     visibility:(L4_NEW.vis||[]).length?L4_NEW.vis.map(v=>L4_VIS.find(x=>x.id===v)?.label||v):["Open Market"],
     bids:0,offers:0,
     quality:L4_NEW.grade?("Grade "+L4_NEW.grade):"Spec pending",
@@ -2096,7 +2638,15 @@ function l4Publish(){
   LISTINGS[newId]=listing;
   persistMarketplaceListings();
   closeL4Wiz();
-  toast("Listing "+newId+" submitted and published.");
+  if(audience==="followers"){
+    const listingLabel=(LISTING_TYPE_LABEL[listing.type]||"listing").toLowerCase();
+    l4NotifyFollowersForListing(newId,creator,listingLabel).then(count=>{
+      if(count>0)toast("Listing "+newId+" published to followers · notified "+count+" account"+(count===1?"":"s")+".");
+      else toast("Listing "+newId+" published to followers.");
+    });
+  }else{
+    toast("Listing "+newId+" submitted and published.");
+  }
   renderMarket();
 }
 
@@ -2130,7 +2680,10 @@ function l4ValidateWizard(){
   if(!isFinite(price)||price<=0)return{ok:false,message:"Enter a price greater than zero on the Specs & Commercial step."};
   if(!L4_NEW.delivery)return{ok:false,message:"Choose a delivery location on the Specs & Commercial step."};
   const closeAt=Number(L4_NEW.closeAt);
-  if(!isFinite(closeAt)||closeAt<=Date.now())return{ok:false,message:"Set a closing time in the future (use Custom close if same-day 17:00 EAT has passed)."};
+  if(!isFinite(closeAt)||closeAt<=Date.now())return{ok:false,message:"Set a closing time in the future (use Custom close if same-day 16:00 LT has passed)."};
+  const vis=Array.isArray(L4_NEW.vis)?L4_NEW.vis:[];
+  if(!vis.length)return{ok:false,message:"Choose at least one visibility option."};
+  if(vis.includes("open")&&vis.includes("followers"))return{ok:false,message:"Choose either Open Market or Followers only."};
   return{ok:true,message:"ok"};
 }
 
@@ -2141,11 +2694,13 @@ function l4CanProceedSpecsCommercial(){
 function l4ValidateStep(step){
   if(step===0)return L4_NEW.flow?{ok:true,message:"ok"}:{ok:false,message:"Tap one of the two cards above: IOI/RFQ or Auction."};
   if(step===1)return L4_NEW.mech?{ok:true,message:"ok"}:{ok:false,message:"Tap a mechanism above (for example IOI, RFQ, or Auction)."};
-  if(step===2)return L4_NEW.category?{ok:true,message:"ok"}:{ok:false,message:"Tap a category tile above to continue."};
-  if(step===3)return L4_NEW.productName?{ok:true,message:"ok"}:{ok:false,message:"Tap a product name above to continue."};
-  if(step===4)return l4ValidateSpecsCommercial();
-  if(step===5){
+  if(step===2)return L4_NEW.category&&L4_NEW.productName?{ok:true,message:"ok"}:{ok:false,message:"Select a category and a product from the dropdowns above."};
+  if(step===3)return l4ValidateSpecsCommercial();
+  if(step===4){
     const vis=Array.isArray(L4_NEW.vis)?L4_NEW.vis:[];
+    if(vis.includes("open")&&vis.includes("followers")){
+      return {ok:false,message:"Choose either Open Market or Followers only, not both."};
+    }
     return vis.length?{ok:true,message:"ok"}:{ok:false,message:"Turn on at least one visibility option (for example Open Market)."};
   }
   return {ok:true,message:"ok"};
@@ -2159,7 +2714,7 @@ function l4ValidateSpecsCommercial(){
   if(!L4_NEW.delivery)return{ok:false,message:"Choose a delivery location from the dropdown."};
   const closeAt=Number(L4_NEW.closeAt);
   if(!isFinite(closeAt))return{ok:false,message:"Under closing time, pick Custom close and choose a date and time."};
-  if(closeAt<=Date.now())return{ok:false,message:"Same-day close at 17:00 EAT has already passed today — use Custom close and pick a future time, or try again tomorrow."};
+  if(closeAt<=Date.now())return{ok:false,message:"Same-day close at 16:00 LT has already passed today — use Custom close and pick a future time, or try again tomorrow."};
   return{ok:true,message:"ok"};
 }
 
@@ -2267,7 +2822,7 @@ function updateStatusBar(){
   // Bell badge
   const over=fl.reduce((n,c)=>n+genMilestones(c).filter(m=>m.status==="over").length,0);
   const warn=fl.reduce((n,c)=>n+genMilestones(c).filter(m=>m.status==="warn").length,0);
-  const total=over+warn;
+  const total=over+warn+l4UnreadNotificationCount();
   const badge=document.getElementById("bell-badge");
   badge.textContent=total;
   badge.style.display=total>0?"flex":"none";
@@ -2849,8 +3404,17 @@ document.addEventListener("click",function(e){
   const isModal=pop.classList.contains("open");
   if(!isHint&&!isModal)return;
   if(e.target.closest("#ms-pop"))return;
+  if(e.target.closest("#l4-actor-sheet"))return;
+  if(e.target.closest("#l4-inquiry-sheet"))return;
   if(isHint&&e.target.closest(".tlrow .ms"))return;
   closeMsPop();
+});
+document.addEventListener("keydown",function(e){
+  if(e.key!=="Escape")return;
+  var a=document.getElementById("l4-actor-sheet");
+  if(a&&a.classList.contains("open")){l4CloseActorSheet();return;}
+  var n=document.getElementById("l4-inquiry-sheet");
+  if(n&&n.classList.contains("open"))l4CloseInquirySheet();
 });
 
 // ═══════════════════════════════════════════════ NOTIFICATIONS ═══
@@ -2858,26 +3422,93 @@ function toggleNotif(){
   notifOpen=!notifOpen;
   document.getElementById("np-ov").classList.toggle("open",notifOpen);
   document.getElementById("notif-pnl").classList.toggle("open",notifOpen);
-  if(notifOpen)renderNotifPanel();
+  if(notifOpen){
+    renderNotifPanel();
+    l4MarkCurrentUserNotificationsRead();
+  }
+}
+function l4GetCurrentUserNotifications(){
+  const user=l4GetCurrentUser();
+  if(!user)return [];
+  const map=L4_NOTIFICATIONS&&typeof L4_NOTIFICATIONS==="object"?L4_NOTIFICATIONS:{};
+  return Array.isArray(map[user])?map[user]:[];
+}
+function l4UnreadNotificationCount(){
+  return l4GetCurrentUserNotifications().filter(function(n){return !n.read;}).length;
+}
+function l4OpenMarketplaceListingFromNotif(listingId){
+  if(!listingId)return;
+  const nav=window.__ANKUARU_GO_TO_MARKETPLACE;
+  if(typeof nav==="function")nav();
+  setTimeout(function(){
+    if(typeof renderMarket==="function")renderMarket();
+    if(typeof showUID==="function")showUID(listingId);
+    l4InjectQuickBidFromNotification(listingId);
+  },140);
+}
+function l4MarkCurrentUserNotificationsRead(){
+  const user=l4GetCurrentUser();
+  if(!user)return;
+  const list=l4GetCurrentUserNotifications();
+  const unreadIds=list.filter(function(n){return !n.read;}).map(function(n){return n.id;});
+  if(!unreadIds.length)return;
+  L4_NOTIFICATIONS[user]=list.map(function(item){return Object.assign({},item,{read:true});});
+  fetch(`/api/marketplace/notifications?_=${Date.now()}`,{
+    method:"POST",
+    headers:{"Content-Type":"application/json","Cache-Control":"no-cache",Pragma:"no-cache"},
+    cache:"no-store",
+    body:JSON.stringify({action:"mark-read",userId:user,ids:unreadIds})
+  }).catch(function(){});
 }
 function renderNotifPanel(){
   const notifs=[];
+  const marketNotifs=l4GetCurrentUserNotifications();
+  marketNotifs.forEach(function(n){
+    notifs.push({
+      kind:"market",
+      p:n.read?3:0,
+      color:n.read?"#9ca3af":"#7C3AED",
+      listingId:n.listingId,
+      title:n.title||"Marketplace update",
+      detail:n.fromUser?`From ${n.fromUser}`:"Marketplace event",
+      time:n.createdAt?new Date(n.createdAt).toLocaleString("en-GB",{hour:"2-digit",minute:"2-digit",day:"2-digit",month:"short"}):"now",
+      read:!!n.read
+    });
+  });
   CONTAINERS.forEach(c=>{
     genMilestones(c).forEach(m=>{
-      if(m.status==="over")notifs.push({p:0,color:"#EF4444",c,m});
-      else if(m.status==="warn")notifs.push({p:1,color:"#F59E0B",c,m});
+      if(m.status==="over")notifs.push({kind:"ops",p:1,color:"#EF4444",c,m});
+      else if(m.status==="warn")notifs.push({kind:"ops",p:2,color:"#F59E0B",c,m});
     });
   });
   notifs.sort((a,b)=>a.p-b.p);
-  const labels=["Overdue","Action Needed"];
-  document.getElementById("np-body").innerHTML=notifs.length?notifs.map(n=>`
-    <div class="ni" onclick="openDetail('${n.c.id}');toggleNotif()">
-      <div class="ni-top"><div class="ni-dot" style="background:${n.color}"></div><div class="ni-title">${n.m.label}</div><div class="ni-time">${labels[n.p]}</div></div>
+  document.getElementById("np-body").innerHTML=notifs.length?notifs.map(n=>{
+    if(n.kind==="market"){
+      const fontWeight=n.read?500:700;
+      const lead=n.read?"Marketplace":"New listing";
+      return `<div class="ni" onclick="l4OpenMarketplaceListingFromNotif('${n.listingId}');toggleNotif()">
+        <div class="ni-top"><div class="ni-dot" style="background:${n.color}"></div><div class="ni-title" style="font-weight:${fontWeight}">${l4HtmlEsc(n.title)}</div><div class="ni-time">${lead}</div></div>
+        <div class="ni-sub">${l4HtmlEsc(n.detail)}</div>
+        <div style="display:flex;align-items:center;gap:5px;padding-left:14px;margin-top:3px">${muid(n.listingId)}<span style="font-size:10px;color:var(--tx3)">${n.time}</span></div>
+      </div>`;
+    }
+    const label=n.p===1?"Overdue":"Action Needed";
+    return `<div class="ni" onclick="openDetail('${n.c.id}');toggleNotif()">
+      <div class="ni-top"><div class="ni-dot" style="background:${n.color}"></div><div class="ni-title">${n.m.label}</div><div class="ni-time">${label}</div></div>
       <div class="ni-sub">${n.m.detail.substring(0,75)}…</div>
       <div style="display:flex;align-items:center;gap:5px;padding-left:14px;margin-top:3px">${muid(n.c.id)}<span style="font-size:10px;color:var(--tx3)">${n.c.grade}</span></div>
       ${n.m.action?`<div class="ni-act">→ ${n.m.action}</div>`:""}
-    </div>`).join(""):
+    </div>`;
+  }).join(""):
     `<div style="padding:32px;text-align:center;color:var(--tx3);font-size:12px">No urgent notifications.<br>All milestones on track.</div>`;
+  const badge=document.getElementById("bell-badge");
+  if(badge){
+    const unread=l4UnreadNotificationCount();
+    if(unread>0){
+      badge.textContent=String(unread);
+      badge.style.display="flex";
+    }
+  }
 }
 
 // ══════════════════════════════════════════════════ BACKSTAGE ════
@@ -2914,6 +3545,20 @@ function toggleExpPortfolioSidebar(){
 function setPortfolioWelcomeVisible(on){
   const w=document.getElementById("portfolio-welcome");
   if(!w)return;
+  const wl=document.getElementById("portfolio-welcome-logo");
+  if(wl&&!wl.getAttribute("src")){
+    const brandImg=document.querySelector("#qat-brand-root img");
+    const src=brandImg&&brandImg.getAttribute?brandImg.getAttribute("src"):"";
+    if(src)wl.setAttribute("src",src);
+  }
+  if(wl){
+    wl.style.width="180px";
+    wl.style.height="180px";
+    wl.style.borderRadius="9999px";
+    wl.style.objectFit="cover";
+    wl.style.overflow="hidden";
+    wl.style.display="block";
+  }
   w.hidden=!on;
 }
 function setExportersSidebarVisible(on){
@@ -2933,11 +3578,19 @@ function setExportersSidebarVisible(on){
 }
 function showBsPortfolioPreview(){
   bsOpen=false;
+  welcomeAtHome=true;
   document.querySelectorAll(".bs-navitem").forEach(function(b){b.classList.remove("on");});
+  const vCards=document.getElementById("v-cards");
+  const vTimeline=document.getElementById("v-timeline");
+  if(vCards)vCards.classList.remove("on");
+  if(vTimeline)vTimeline.classList.remove("on");
   const dyn=document.getElementById("bs-dynamic");
   if(dyn){dyn.innerHTML="";dyn.hidden=true;}
   setExportersSidebarVisible(false);
+  const va=document.getElementById("view-area");
+  if(va)va.innerHTML="";
   setPortfolioWelcomeVisible(true);
+  if(typeof window!=="undefined"&&window.__ANKUARU_LEGACY_MAIN_VIEW)window.__ANKUARU_LEGACY_MAIN_VIEW("welcome");
 }
 function openBackstage(section){
   const bs=document.getElementById("backstage");
@@ -3959,7 +4612,7 @@ function buildTraceFarmParcelTip(tr,c,ll,farmId,hrvId,isSubject){
   const sub=[];
   if(hrv&&hrv.weight)sub.push(hrv.weight.toLocaleString()+" kg cherry");
   if(farm&&farm.variety)sub.push(farm.variety);
-  sub.push("Plot record linked to trace (simulated geometry).");
+  sub.push("Plot record linked to trace.");
   return farmMapTooltipHTML({
     isSubject:!!isSubject,
     region:zone.region,
@@ -4009,7 +4662,7 @@ function farmMapSyntheticParcelSummaryHTML(o){
     ["Coffee trees (est.)",farmMapEsc(o.trees)],
   ];
   if(o.subtitle)rows.push(["Note",farmMapEsc(o.subtitle)]);
-  return'<div class="hrv-map-sum"><div class="hrv-map-sum-h">Demo adjacent plot</div><dl class="hrv-map-sum-dl">'+rows.map(([k,v])=>"<div><dt>"+farmMapEsc(k)+"</dt><dd>"+v+"</dd></div>").join("")+"</dl></div>";
+  return'<div class="hrv-map-sum"><div class="hrv-map-sum-h">Adjacent plot</div><dl class="hrv-map-sum-dl">'+rows.map(([k,v])=>"<div><dt>"+farmMapEsc(k)+"</dt><dd>"+v+"</dd></div>").join("")+"</dl></div>";
 }
 function farmMapPolygonCentroid(latlngs){
   let la=0,ln=0,n=latlngs.length;
@@ -4248,7 +4901,7 @@ function genMergedPlotFieldNeighbours(cLat,cLng,subjectKey,zone,woreda,wId,gridO
       trees:String(trees),
       hh:String(hh),
       areaSqm:String(areaSqm),
-      subtitle:"Merged field parcel · access lanes between blocks (demo, not survey).",
+      subtitle:"Merged field parcel · access lanes between blocks (illustrative layout).",
     };
     out.push({ring,meta,gr:Math.floor((r0+r1)/2),gc:Math.floor((c0+c1)/2)});
     k++;
@@ -4362,13 +5015,13 @@ function openHrvMapModal(containerId, focusHrvId, focusFarmUid, mapOpts){
   const ttOpts={sticky:true,direction:"auto",opacity:1,className:"farm-map-tt"};
   if(focusHrvId){
     document.getElementById("hrv-map-title").textContent=focusHrvId+" · farm neighbourhood";
-    sub.textContent="Default terrain · Street / satellite in layer menu · merged parcels + roads · trace + ~300 demos · Bottom-left target icon centers the selection · "+(c.grade||"")+(exp?" · "+exp.short:"");
+    sub.textContent="Default terrain · Street / satellite in layer menu · merged parcels + roads · trace + ~300 neighbouring parcels · Bottom-left target icon centers the selection · "+(c.grade||"")+(exp?" · "+exp.short:"");
   }else if(focusFarmUid){
     document.getElementById("hrv-map-title").textContent=focusFarmUid+" · farm neighbourhood";
-    sub.textContent="Default terrain · Street / satellite in layer menu · merged parcels + roads · trace + ~300 demos · Bottom-left target icon centers the selection · "+(c.grade||"");
+    sub.textContent="Default terrain · Street / satellite in layer menu · merged parcels + roads · trace + ~300 neighbouring parcels · Bottom-left target icon centers the selection · "+(c.grade||"");
   }else if(exploreMerged){
     document.getElementById("hrv-map-title").textContent="Field map · "+c.id;
-    sub.textContent="Merged ~300 demo parcels (terrain default) · click any polygon to select · no trace subject · target icon recenters selection or full field · "+(show.length?show.length+" harvest anchor(s) · ":"")+(c.grade||"")+(exp?" · "+exp.short:"");
+    sub.textContent="Merged ~300 field parcels (terrain default) · click any polygon to select · no trace subject · target icon recenters selection or full field · "+(show.length?show.length+" harvest anchor(s) · ":"")+(c.grade||"")+(exp?" · "+exp.short:"");
   }else{
     document.getElementById("hrv-map-title").textContent="All harvest batches · "+c.id;
     sub.textContent=show.length?`Hover parcels for woreda / household / plot data · ${show.length} batch(es) — ${c.grade||""} · ${exp?exp.short:"—"}`:"No harvest GPS in trace.";
@@ -4491,14 +5144,14 @@ function openHrvMapModal(containerId, focusHrvId, focusFarmUid, mapOpts){
               const su0=(p.meta.farmUid||"").replace(/^SIM-PLOT-/,"#");
               pin=L.marker([cen.lat,cen.lng],{icon:farmMapRedIcon(),zIndexOffset:500,interactive:false}).addTo(lg);
               labelMk=L.marker([cen.lat+dLat*0.35,cen.lng],{
-                icon:farmMapSubjectLabelIcon(su0||"Demo plot"),
+                icon:farmMapSubjectLabelIcon(su0||"Plot"),
                 interactive:false,
                 zIndexOffset:460,
               }).addTo(lg);
             }else{
               pin.setLatLng(cen);
               const shortUid=(p.meta.farmUid||"").replace(/^SIM-PLOT-/,"#");
-              labelMk.setIcon(farmMapSubjectLabelIcon(shortUid||"Demo plot"));
+              labelMk.setIcon(farmMapSubjectLabelIcon(shortUid||"Plot"));
               labelMk.setLatLng(L.latLng(cen.lat+dLat*0.35,cen.lng));
             }
           }
@@ -4534,8 +5187,8 @@ function openHrvMapModal(containerId, focusHrvId, focusFarmUid, mapOpts){
           const a=L.DomUtil.create("a","hrv-map-center-btn",w);
           a.href="#";
           a.title=exploreMerged
-            ?"Center the map on the selected parcel, or on the full demo field if none is selected"
-            :"Center the map on the currently selected parcel (trace or demo plot)";
+            ?"Center the map on the selected parcel, or on the full field if none is selected"
+            :"Center the map on the currently selected parcel";
           a.setAttribute("role","button");
           a.setAttribute("aria-label","Center map on selection or field");
           a.innerHTML='<svg class="hrv-map-center-svg" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="3.25" fill="none" stroke="currentColor" stroke-width="2.25"/><path fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" d="M12 4.5V8M12 16v3.5M4.5 12H8M16 12h3.5"/></svg>';
@@ -4566,8 +5219,8 @@ function openHrvMapModal(containerId, focusHrvId, focusFarmUid, mapOpts){
         },
       });
       const legHtml=exploreMerged
-        ?'<div class="hrv-leg-row"><span class="hrv-leg-swatch hrv-leg-subj"></span> Selected parcel</div><div class="hrv-leg-row"><span class="hrv-leg-swatch hrv-leg-nei"></span> Demo plots (~300) · tap to explore</div>'
-        :'<div class="hrv-leg-row"><span class="hrv-leg-swatch hrv-leg-subj"></span> Selected parcel</div><div class="hrv-leg-row"><span class="hrv-leg-swatch hrv-leg-nei"></span> Other plots (~300 demo)</div>';
+        ?'<div class="hrv-leg-row"><span class="hrv-leg-swatch hrv-leg-subj"></span> Selected parcel</div><div class="hrv-leg-row"><span class="hrv-leg-swatch hrv-leg-nei"></span> Neighbouring parcels (~300) · tap to explore</div>'
+        :'<div class="hrv-leg-row"><span class="hrv-leg-swatch hrv-leg-subj"></span> Selected parcel</div><div class="hrv-leg-row"><span class="hrv-leg-swatch hrv-leg-nei"></span> Other parcels (~300)</div>';
       hrvMapAddStandardControls(_hrvMap,legHtml,{defaultLayer:"topo"});
       (new HrvCenterCtrl()).addTo(_hrvMap);
     }else{
@@ -4662,7 +5315,7 @@ function getUIDMeta(uid){
   if(uid.startsWith("PAY-")){const p=PAYMENTS[uid];if(p){payShowDetail(uid);return"";}return null;}
   if(uid.startsWith("BNK-")){const b=BANK_PANEL[uid];if(!b)return null;return`<div class="mty">Partner Bank · Bank Panel</div><div class="mti">${b.name}</div>${mgr([["Bank UID",uid],["Short",b.short],["Type",b.type],["Trade Desk",b.desk],["Rate",b.rate]])}<div class="ms2">Capabilities</div><div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px">${b.capabilities.map(c=>`<span style="font-size:10px;background:rgba(58,122,138,.1);color:#3a7a8a;padding:3px 8px;border-radius:8px;border:1px solid rgba(58,122,138,.3)">${c}</span>`).join("")}</div><div style="margin-top:10px;padding:8px 10px;background:rgba(58,122,138,.06);border-left:2px solid #3a7a8a;font-size:11px;color:var(--tx2);border-radius:3px">Pre-approved partner panel · NBE-licensed or correspondent-capable</div>`;}
   if(uid.startsWith("CTR-")){const c=CONTRACTS[uid];if(c){ctrShowDetail(uid);return"";}return null;}
-  if(uid.startsWith("LIST-")){const L=LISTINGS[uid];if(!L)return null;const c=LISTING_STATE_COLOR[L.state]||"#666";const stateBadge=`<span style="display:inline-block;padding:2px 7px;border-radius:10px;font-size:9px;font-weight:700;letter-spacing:.05em;background:${c};color:#fff">${L.state}</span>`;const rows=[["Listing UID",uid],["Type",LISTING_TYPE_LABEL[L.type]],["State",L.state]];if(L.lot)rows.push(["Lot",L.lot]);if(L.weight)rows.push(["Weight",L.weight.toLocaleString()+" kg"]);if(L.grade)rows.push(["Grade / Spec",L.grade]);if(L.quality)rows.push(["Quality",L.quality]);rows.push(["Price Mode",L.priceMode]);if(L.priceUSDkg)rows.push(["Asking",L.priceUSDkg+" USD/kg"]);if(L.reserveUSDkg)rows.push(["Reserve",L.reserveUSDkg+" USD/kg"]);if(L.currentUSDkg)rows.push(["Current Bid",L.currentUSDkg+" USD/kg"]);if(L.ceilingUSDkg)rows.push(["Ceiling",L.ceilingUSDkg+" USD/kg"]);if(L.currentLowUSDkg)rows.push(["Current Low",L.currentLowUSDkg+" USD/kg"]);if(L.differential)rows.push(["Differential",L.differential]);if(L.minIncrement)rows.push(["Min Increment",L.minIncrement]);if(L.incoterm)rows.push(["Incoterm",L.incoterm]);if(L.duration)rows.push(["Duration",L.duration]);if(L.ends)rows.push(["Closes",L.ends]);if(L.antiSniping)rows.push(["Anti-Sniping",L.antiSniping]);if(L.bids!==undefined)rows.push(["Bids",String(L.bids)]);if(L.offers!==undefined)rows.push(["Offers Received",String(L.offers)]);if(L.bidsReceived!==undefined)rows.push(["Sealed Bids",String(L.bidsReceived)+" (blind)"]);rows.push(["Visibility",L.visibility.join(" + ")]);if(L.eudr)rows.push(["EUDR","Eligible"]);const idLine=L.sellerVisible===false?"Seller: anonymous (revealed at match)":(L.seller?"Seller: "+L.seller:(L.buyer?"Buyer: "+L.buyer+" — "+L.buyerCompany:""));const sheetHero=L.endsAt&&(L.state==="LIVE"||L.state==="ENGAGED")&&(L.type==="ENG"||L.type==="SEALED"||L.type==="REV");const cdHead=L.type==="SEALED"?"Sealed auction closes in":L.type==="ENG"?"English auction closes in":"Reverse auction closes in";const countdownHtml=sheetHero?`<div class="l4-sheet-hero" role="timer" aria-live="polite"><div class="l4-sheet-hero__kicker">${cdHead}<span class="l4-sheet-hero__demo-tag"> · demo</span></div><div class="l4-sheet-hero__time"><span class="l4-timer" data-l4-timer="${L.endsAt}">${l4FmtTimer(L.endsAt-Date.now())}</span></div><div class="l4-sheet-hero__foot"><span>Published schedule</span><b>${L.ends||"—"}</b></div></div>`:"";return`${countdownHtml}<div class="mty">Marketplace Listing ${stateBadge}</div><div class="mti">${LISTING_TYPE_LABEL[L.type]}</div>${mgr(rows)}<div class="ms2">${idLine}</div>${L.lot?mrel("Lot",[muid(L.lot)]):""}${L.note?`<div style="margin-top:8px;padding:8px 10px;background:rgba(124,58,237,.08);border-left:2px solid #7C3AED;font-size:11px;color:var(--tx2);border-radius:3px">${L.note}</div>`:""}<div style="margin-top:8px;padding:8px 10px;background:rgba(124,58,237,.08);border-left:2px solid #7C3AED;font-size:11px;color:var(--tx2);border-radius:3px">Matchmaking & Price Discovery · on match → Contracting</div>`;}
+  if(uid.startsWith("LIST-")){const L=LISTINGS[uid];if(!L)return null;const c=LISTING_STATE_COLOR[L.state]||"#666";const stateBadge=`<span style="display:inline-block;padding:2px 7px;border-radius:10px;font-size:9px;font-weight:700;letter-spacing:.05em;background:${c};color:#fff">${L.state}</span>`;const creator=L.creator||L.seller||L.buyer||"system";const rows=[["Listing UID",uid],["Type",LISTING_TYPE_LABEL[L.type]],["State",L.state],["Creator",creator]];if(L.lot)rows.push(["Lot",L.lot]);if(L.weight)rows.push(["Weight",L.weight.toLocaleString()+" kg"]);if(L.grade)rows.push(["Grade / Spec",L.grade]);if(L.quality)rows.push(["Quality",L.quality]);rows.push(["Price Mode",L.priceMode]);if(L.priceUSDkg)rows.push(["Asking",L.priceUSDkg+" USD/kg"]);if(L.reserveUSDkg)rows.push(["Reserve",L.reserveUSDkg+" USD/kg"]);if(L.currentUSDkg)rows.push(["Current Bid",L.currentUSDkg+" USD/kg"]);if(L.ceilingUSDkg)rows.push(["Ceiling",L.ceilingUSDkg+" USD/kg"]);if(L.currentLowUSDkg)rows.push(["Current Low",L.currentLowUSDkg+" USD/kg"]);if(L.differential)rows.push(["Differential",L.differential]);if(L.minIncrement)rows.push(["Min Increment",L.minIncrement]);if(L.incoterm)rows.push(["Incoterm",L.incoterm]);if(L.duration)rows.push(["Duration",L.duration]);if(L.ends)rows.push(["Closes",L.ends]);if(L.antiSniping)rows.push(["Anti-Sniping",L.antiSniping]);if(L.bids!==undefined)rows.push(["Bids",String(L.bids)]);if(L.offers!==undefined)rows.push(["Offers Received",String(L.offers)]);if(L.bidsReceived!==undefined)rows.push(["Sealed Bids",String(L.bidsReceived)+" (blind)"]);rows.push(["Visibility",L.visibility.join(" + ")]);if(L.eudr)rows.push(["EUDR","Eligible"]);const idLine=L.sellerVisible===false?"Seller: anonymous (revealed at match)":(L.seller?"Seller: "+L.seller:(L.buyer?"Buyer: "+L.buyer+" — "+L.buyerCompany:""));const sheetHero=L.endsAt&&(L.state==="LIVE"||L.state==="ENGAGED")&&(L.type==="ENG"||L.type==="SEALED"||L.type==="REV");const cdHead=L.type==="SEALED"?"Sealed auction closes in":L.type==="ENG"?"English auction closes in":"Reverse auction closes in";const countdownHtml=sheetHero?`<div class="l4-sheet-hero" role="timer" aria-live="polite"><div class="l4-sheet-hero__kicker">${cdHead}<span class="l4-sheet-hero__demo-tag"> · demo</span></div><div class="l4-sheet-hero__time"><span class="l4-timer" data-l4-timer="${L.endsAt}">${l4FmtTimer(L.endsAt-Date.now())}</span></div><div class="l4-sheet-hero__foot"><span>Published schedule</span><b>${L.ends||"—"}</b></div></div>`:"";return`${countdownHtml}<div class="mty">Marketplace Listing ${stateBadge}</div><div class="mti">${LISTING_TYPE_LABEL[L.type]}</div><div style="margin:8px 0 10px;padding:9px 11px;border:1px solid #d9c8f8;background:rgba(124,58,237,.08);border-radius:6px;font-size:14px;font-weight:800;color:#4c1d95">Creator: ${l4HtmlEsc(String(creator))}</div>${mgr(rows)}<div class="ms2">${idLine}</div>${L.lot?mrel("Lot",[muid(L.lot)]):""}${L.note?`<div style="margin-top:8px;padding:8px 10px;background:rgba(124,58,237,.08);border-left:2px solid #7C3AED;font-size:11px;color:var(--tx2);border-radius:3px">${L.note}</div>`:""}<div style="margin-top:8px;padding:8px 10px;background:rgba(124,58,237,.08);border-left:2px solid #7C3AED;font-size:11px;color:var(--tx2);border-radius:3px">Matchmaking & Price Discovery · on match → Contracting</div>`;}
   
   
   if(uid.startsWith("FARM-")){let fn=null,farmCid=null;for(const cId in traceCache){const n=traceCache[cId].nodes[uid];if(n){fn=n;farmCid=cId;break;}}if(!fn)return`<div class="mty">Registered Farm</div><div class="mti">${uid}</div><div style="font-size:11px;color:var(--tx3);margin-top:8px">Expand trace tree first to load farm data.</div>`;const aid=actorLookup(fn.farmer)||"ACT-FRM-0241";const fc=farmCid?CONTAINERS.find(x=>x.id===farmCid):null;const farmGps=fn.gps&&(fc&&TRACE_OK.includes(fc.status))?`<span class="gps-val-wrap"><span class="gps-txt">${fn.gps}</span><button type="button" class="gps-map-btn-inline" onclick="event.stopPropagation();openHrvMapModal('${farmCid}',null,'${uid}')" title="Map harvests at this farm">${HRV_MAP_SVG12}</button></span>`:fn.gps;return`<div class="mty">Registered Farm</div><div class="mti">${fn.farmer}</div>${mgr([["Farm UID",uid],["Farmer",fn.farmer],["Plot",fn.ha+" ha"],["GPS",farmGps],["Woreda",fn.wrdaId||"—"],["Zone",fn.zoneId||"—"],["Variety",fn.variety||"—"],["Verified Since",fn.since]])}${mrel("Operator",[muid(aid)])}${mrel("Woreda",fn.wrdaId?[muid(fn.wrdaId)]:[])}${mrel("Zone",fn.zoneId?[muid(fn.zoneId)]:[])}`;} 
@@ -4690,17 +5343,16 @@ document.addEventListener("keydown",e=>{
 
 function toast(msg){
   const t=document.createElement("div");
-  t.style.cssText="position:fixed;bottom:36px;left:50%;transform:translateX(-50%);background:var(--dark);color:var(--amber);padding:7px 16px;border-radius:20px;font-size:11px;z-index:999;font-family:'SF Mono',Menlo,monospace;white-space:nowrap;box-shadow:0 4px 16px rgba(0,0,0,.25);transition:opacity .3s";
+  t.style.cssText="position:fixed;bottom:36px;left:50%;transform:translateX(-50%);background:var(--dark);color:var(--amber);padding:7px 16px;border-radius:20px;font-size:11px;z-index:10000;font-family:'SF Mono',Menlo,monospace;white-space:nowrap;box-shadow:0 4px 16px rgba(0,0,0,.25);transition:opacity .3s;pointer-events:none";
   t.textContent=msg;document.body.appendChild(t);
   setTimeout(()=>{t.style.opacity="0";setTimeout(()=>t.remove(),300);},2200);
 }
 
 // ═══════════════════════════════════════════════════════ INIT ════
 relocateQatBrandToSidebar();
-renderView();
+if(typeof showBsPortfolioPreview==="function")showBsPortfolioPreview();
 renderRibbon();
 updateStatusBar();
-if(typeof showBsPortfolioPreview==="function")showBsPortfolioPreview();
 
 // Boot Risk layer (Layer 9) on page load
 setTimeout(function(){if(typeof bootRiskLayer==="function")bootRiskLayer();},100);

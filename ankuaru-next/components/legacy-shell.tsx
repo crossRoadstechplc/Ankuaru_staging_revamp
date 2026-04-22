@@ -10,7 +10,7 @@ function mountMarketplaceTabs(root: HTMLElement) {
   const viewArea = root.querySelector<HTMLElement>("#view-area");
   const toolbar = root.querySelector<HTMLElement>(".main-toolbar");
   if (!viewArea) return;
-  const split = viewArea.querySelector<HTMLElement>(".l4-market-split");
+  const split = viewArea.querySelector<HTMLElement>(".l4-market-split:not([aria-hidden='true'])");
   if (!split || !toolbar) return;
 
   // Remove legacy status/view control strip in Marketplace (user requested).
@@ -24,8 +24,8 @@ function mountMarketplaceTabs(root: HTMLElement) {
     }
   });
 
-  const auctionBlock = split.querySelector<HTMLElement>(".l4-market-block");
   const otherBlock = split.querySelector<HTMLElement>(".l4-market-block--secondary");
+  const auctionBlock = split.querySelector<HTMLElement>(".l4-market-block:not(.l4-market-block--secondary)");
   if (!auctionBlock || !otherBlock) return;
 
   let tabs = toolbar.querySelector<HTMLElement>("#marketplace-toolbar-tabs");
@@ -34,7 +34,7 @@ function mountMarketplaceTabs(root: HTMLElement) {
     tabs.id = "marketplace-toolbar-tabs";
     tabs.className = "marketplace-top-tabs";
     tabs.innerHTML =
-      '<span class="marketplace-tabs-label">Market:</span><button type="button" class="marketplace-tab active" data-market-tab="ioi-rfq">IOI/RFQ</button><button type="button" class="marketplace-tab" data-market-tab="auctions">Auctions</button><button type="button" class="marketplace-tab" data-market-tab="all">All</button>';
+      '<span class="marketplace-tabs-label">Market:</span><button type="button" class="marketplace-tab active" data-market-tab="auctions">Auctions</button><button type="button" class="marketplace-tab" data-market-tab="ioi-rfq">IOI/RFQ</button><button type="button" class="marketplace-tab" data-market-tab="all">All</button><button type="button" class="marketplace-add-listing-btn" id="marketplace-add-listing-btn">+ New Listing</button>';
     toolbar.appendChild(tabs);
   }
 
@@ -58,36 +58,20 @@ function mountMarketplaceTabs(root: HTMLElement) {
     if (button.dataset.bound === "true") return;
     button.dataset.bound = "true";
     button.addEventListener("click", () =>
-      applyTab((button.dataset.marketTab as "ioi-rfq" | "auctions" | "all") ?? "ioi-rfq"),
+      applyTab((button.dataset.marketTab as "ioi-rfq" | "auctions" | "all") ?? "auctions"),
     );
   });
-  const selected = (root.dataset.marketTab as "ioi-rfq" | "auctions" | "all" | undefined) ?? "ioi-rfq";
+  const selected = (root.dataset.marketTab as "ioi-rfq" | "auctions" | "all" | undefined) ?? "auctions";
   applyTab(selected);
 
-  // Enforce per-column independent scrolling.
-  root.querySelectorAll<HTMLElement>(".l4-cat-col").forEach((col) => {
-    col.style.height = "560px";
-    col.style.minHeight = "560px";
-    col.style.overflow = "hidden";
-  });
-  root.querySelectorAll<HTMLElement>(".l4-cat-stack").forEach((stack) => {
-    stack.style.flex = "1 1 auto";
-    stack.style.minHeight = "0";
-    stack.style.overflowY = "auto";
-    stack.style.overscrollBehavior = "contain";
-    if (stack.dataset.scrollBound === "true") return;
-    stack.dataset.scrollBound = "true";
-    stack.addEventListener(
-      "wheel",
-      (event) => {
-        const target = event.currentTarget as HTMLElement;
-        const canScroll = target.scrollHeight > target.clientHeight;
-        if (!canScroll) return;
-        event.stopPropagation();
-      },
-      { passive: true },
-    );
-  });
+  const addButton = tabs.querySelector<HTMLButtonElement>("#marketplace-add-listing-btn");
+  if (addButton && addButton.dataset.bound !== "true") {
+    addButton.dataset.bound = "true";
+    addButton.addEventListener("click", () => {
+      const win = window as unknown as { openListingWizard?: () => void };
+      if (typeof win.openListingWizard === "function") win.openListingWizard();
+    });
+  }
 }
 
 function ensureSidebarLogo(root: HTMLElement) {
@@ -114,8 +98,6 @@ function syncDomState(root: HTMLElement, state: ReturnType<typeof useAppStore.ge
     }
   ).__ANKUARU_CURRENT_USER = state.authUser?.username ?? null;
   ensureSidebarLogo(root);
-  root.querySelectorAll<HTMLElement>(".bs-navitem").forEach((item) => item.classList.remove("on"));
-  root.querySelector<HTMLElement>("#bsn-auction")?.classList.add("on");
 
   const qatTitle = root.querySelector<HTMLElement>("#qat-title");
   if (qatTitle) qatTitle.textContent = state.authUser ? state.authUser.username : state.portfolioTitle;
@@ -199,20 +181,66 @@ export function LegacyShell() {
 
       (
         window as unknown as {
+          __ANKUARU_LEGACY_MAIN_VIEW?: (mode: "welcome" | "cards" | "timeline" | "market") => void;
+          __ANKUARU_GO_TO_MARKETPLACE?: () => void;
+        }
+      ).__ANKUARU_LEGACY_MAIN_VIEW = (mode) => {
+        useAppStore.getState().setViewMode(mode);
+      };
+      (
+        window as unknown as {
+          __ANKUARU_GO_TO_MARKETPLACE?: () => void;
+        }
+      ).__ANKUARU_GO_TO_MARKETPLACE = () => {
+        useAppStore.getState().setViewMode("market");
+        useAppStore.getState().setRibbonTab("home");
+        root.querySelector<HTMLElement>("#tab-home")?.click();
+        root.querySelector<HTMLElement>("#bsn-auction")?.click();
+      };
+
+      (
+        window as unknown as {
           __ANKUARU_SYNC_LISTINGS?: (listings: Record<string, Record<string, unknown>>) => Promise<void>;
           __ANKUARU_SET_LISTINGS?: (listings: Record<string, Record<string, unknown>>) => void;
+          __ANKUARU_SYNC_NOTIFICATIONS?: (notifications: Record<string, unknown[]>) => Promise<void>;
+          __ANKUARU_SET_FOLLOWS?: (follows: Record<string, string[]>) => void;
+          __ANKUARU_SET_NOTIFS?: (notifications: Record<string, unknown[]>) => void;
         }
       ).__ANKUARU_SYNC_LISTINGS = async (listings) => {
-        await fetch("/api/marketplace/listings", {
+        await fetch(`/api/marketplace/listings?_=${Date.now()}`, {
           method: "PUT",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            "Cache-Control": "no-cache",
+            Pragma: "no-cache",
+          },
+          cache: "no-store",
           body: JSON.stringify({ listings }),
+        });
+      };
+      (
+        window as unknown as {
+          __ANKUARU_SYNC_NOTIFICATIONS?: (notifications: Record<string, unknown[]>) => Promise<void>;
+        }
+      ).__ANKUARU_SYNC_NOTIFICATIONS = async (notifications) => {
+        await fetch(`/api/marketplace/notifications?_=${Date.now()}`, {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            "Cache-Control": "no-cache",
+            Pragma: "no-cache",
+          },
+          cache: "no-store",
+          body: JSON.stringify({ notifications }),
         });
       };
 
       const pullListings = async () => {
         try {
-          const response = await fetch("/api/marketplace/listings", { cache: "no-store" });
+          const response = await fetch(`/api/marketplace/listings?_=${Date.now()}`, {
+            cache: "no-store",
+            headers: { "Cache-Control": "no-cache", Pragma: "no-cache" },
+          });
           const payload = (await response.json()) as { listings?: Record<string, Record<string, unknown>> };
           if (!payload.listings || canceled) return;
           const nextSig = JSON.stringify(payload.listings);
@@ -227,7 +255,52 @@ export function LegacyShell() {
           // keep legacy in-file listings if API load fails
         }
       };
+      const pullFollows = async () => {
+        try {
+          const response = await fetch(`/api/marketplace/follows?_=${Date.now()}`, {
+            cache: "no-store",
+            headers: { "Cache-Control": "no-cache", Pragma: "no-cache" },
+          });
+          const payload = (await response.json()) as { follows?: Record<string, string[]> };
+          if (!payload.follows || canceled) return;
+          (
+            window as unknown as {
+              __ANKUARU_SET_FOLLOWS?: (follows: Record<string, string[]>) => void;
+            }
+          ).__ANKUARU_SET_FOLLOWS?.(payload.follows);
+        } catch {
+          // keep legacy in-script defaults if follows API fails
+        }
+      };
+      const pullNotifications = async () => {
+        try {
+          const user = useAppStore.getState().authUser?.username;
+          if (!user || canceled) {
+            useAppStore.getState().setNotificationsUnreadCount(0);
+            return;
+          }
+          const response = await fetch(`/api/marketplace/notifications?user=${encodeURIComponent(user)}&_=${Date.now()}`, {
+            cache: "no-store",
+            headers: { "Cache-Control": "no-cache", Pragma: "no-cache" },
+          });
+          const payload = (await response.json()) as {
+            items?: unknown[];
+            unreadCount?: number;
+          };
+          const items = Array.isArray(payload.items) ? payload.items : [];
+          (
+            window as unknown as {
+              __ANKUARU_SET_NOTIFS?: (notifications: Record<string, unknown[]>) => void;
+            }
+          ).__ANKUARU_SET_NOTIFS?.({ [user]: items });
+          useAppStore.getState().setNotificationsUnreadCount(Number(payload.unreadCount || 0));
+        } catch {
+          // keep existing notification UI when API fails
+        }
+      };
       await pullListings();
+      await pullFollows();
+      await pullNotifications();
       try {
         const response = await fetch("/api/marketplace/taxonomy");
         const payload = (await response.json()) as { taxonomy?: Record<string, unknown> };
@@ -251,8 +324,8 @@ export function LegacyShell() {
       const tabHandlers = [
         { selector: "#tab-home", value: "home" },
         { selector: "#tab-actors", value: "actors" },
-        { selector: "#tab-compliance", value: "compliance" },
-        { selector: "#tab-reports", value: "reports" },
+        { selector: "#tab-transactions", value: "transactions" },
+        { selector: "#tab-followers", value: "followers" },
       ];
       tabHandlers.forEach(({ selector, value }) => {
         root.querySelector(selector)?.addEventListener("click", () => useAppStore.getState().setRibbonTab(value));
@@ -280,16 +353,8 @@ export function LegacyShell() {
         auctionButton.title = "Marketplace — live listings and matchmaking";
         auctionButton.innerHTML = `${svg?.outerHTML ?? ""}Marketplace`;
         setTimeout(() => {
-          const openAuction = (window as unknown as { openAuctionFromSidebar?: (btn: HTMLButtonElement) => void }).openAuctionFromSidebar;
-          if (openAuction) openAuction(auctionButton);
-          else auctionButton.classList.add("on");
           mountMarketplaceTabs(root);
         }, 0);
-        setTimeout(() => {
-          const openAuction = (window as unknown as { openAuctionFromSidebar?: (btn: HTMLButtonElement) => void }).openAuctionFromSidebar;
-          if (openAuction) openAuction(auctionButton);
-          auctionButton.classList.add("on");
-        }, 120);
       }
 
       const viewArea = root.querySelector<HTMLElement>("#view-area");
@@ -303,15 +368,25 @@ export function LegacyShell() {
       }
       const listingsPoller = setInterval(() => {
         void pullListings();
-      }, 4000);
+        void pullFollows();
+        void pullNotifications();
+      }, 2000);
 
       syncDomState(root, useAppStore.getState());
 
       return () => {
         marketObserver?.disconnect();
         clearInterval(listingsPoller);
-        const win = window as unknown as { __ANKUARU_SYNC_LISTINGS?: unknown };
+        const win = window as unknown as {
+          __ANKUARU_SYNC_LISTINGS?: unknown;
+          __ANKUARU_SYNC_NOTIFICATIONS?: unknown;
+          __ANKUARU_LEGACY_MAIN_VIEW?: unknown;
+          __ANKUARU_GO_TO_MARKETPLACE?: unknown;
+        };
         delete win.__ANKUARU_SYNC_LISTINGS;
+        delete win.__ANKUARU_SYNC_NOTIFICATIONS;
+        delete win.__ANKUARU_LEGACY_MAIN_VIEW;
+        delete win.__ANKUARU_GO_TO_MARKETPLACE;
       };
     };
 

@@ -23,7 +23,7 @@
       </button>
       <button class="bs-navitem" id="bsn-settlement" onclick="showBsSection('settlement',this)"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M2 8h12M5 5l-3 3 3 3M11 5l3 3-3 3"/></svg>Settlement</button>
       <button class="bs-navitem" id="bsn-actors" onclick="showBsSection('actors',this)">
-        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="8" cy="5" r="3"/><path d="M2 14c0-3 2.7-5 6-5s6 2 6 5"/></svg>Actors &amp; Identity
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="8" cy="5" r="3"/><path d="M2 14c0-3 2.7-5 6-5s6 2 6 5"/></svg>Merchants &amp; Identity
       </button>
       <button type="button" class="bs-navitem" id="bsn-exporters" onclick="showBsSection('exporters',this)" title="Portfolio — exporters, lots, and shipment views">
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M2 7h5v7H2zM9 5h5v9H9z"/><path d="M4 7V4h9v3M8 4V2"/></svg>Exporters
@@ -81,9 +81,9 @@
     <button class="rtab ctx-tab" onclick="switchRTab('contracts',this)" id="tab-contracts" style="display:none">Contracts</button>
     <button class="rtab ctx-tab" onclick="switchRTab('trace',this)" id="tab-trace" style="display:none">Trace</button>
     <button class="rtab ctx-tab" onclick="switchRTab('quality',this)" id="tab-quality" style="display:none">Quality</button>
-    <button class="rtab" onclick="switchRTab('actors',this)" id="tab-actors">Actors</button>
-    <button class="rtab" onclick="switchRTab('compliance',this)" id="tab-compliance">Compliance</button>
-    <button class="rtab" onclick="switchRTab('reports',this)" id="tab-reports">Reports</button>
+    <button class="rtab" onclick="switchRTab('actors',this)" id="tab-actors">Merchants</button>
+    <button class="rtab" onclick="switchRTab('transactions',this)" id="tab-transactions">Transactions</button>
+    <button class="rtab" onclick="switchRTab('followers',this)" id="tab-followers">Followers</button>
   </div>
   <div class="rbody" id="rbody"></div>
 </div>
@@ -120,14 +120,16 @@
       <button class="tp" onclick="filterSt('EXPORTED',this)">Exported</button>
       <div class="tp-sep"></div>
       <span style="font-size:10px;color:var(--tx3)">View:</span>
-      <button class="tp on" id="v-cards" onclick="setView('cards',this)">Cards</button>
+      <button class="tp" id="v-cards" onclick="setView('cards',this)">Cards</button>
       <button class="tp" id="v-timeline" onclick="setView('timeline',this)">Timeline</button>
-      <button type="button" class="tp" id="v-fieldmap" onclick="openToolbarFieldMap()" title="Merged parcel field map — explore all demo plots (current shipment, no trace subject)" aria-label="Open field map">Field map</button>
+      <button type="button" class="tp" id="v-fieldmap" onclick="openToolbarFieldMap()" title="Merged parcel field map — explore all field parcels (current shipment, no trace subject)" aria-label="Open field map">Field map</button>
       
     </div>
     <div class="view-area" id="view-area"></div>
-    <div id="portfolio-welcome" class="portfolio-welcome" role="status" aria-live="polite">
+    <div id="portfolio-welcome" class="portfolio-welcome flex flex-col items-center justify-center" role="status" aria-live="polite">
+      <img id="portfolio-welcome-logo" class="portfolio-welcome-logo" alt="Ankuaru logo" />
       <p class="portfolio-welcome-text">Welcome to Ankuaru</p>
+      <p class="portfolio-welcome-hint" style="margin:12px 0 0;font-size:13px;color:#9a8a7a;max-width:28em;line-height:1.45">Choose a destination from the sidebar to begin.</p>
     </div>
   </div>
 
@@ -218,6 +220,24 @@
   <div id="ms-pop-body"></div>
 </div>
 
+<div class="l4-actor-sheet" id="l4-actor-sheet" aria-hidden="true">
+  <div class="l4-actor-sheet__overlay" onclick="l4CloseActorSheet()" aria-hidden="true"></div>
+  <div class="l4-actor-sheet__panel" role="dialog" aria-modal="true" aria-labelledby="l4-actor-sheet-title" onclick="event.stopPropagation()">
+    <div class="l4-actor-sheet__grab" aria-hidden="true"></div>
+    <button type="button" class="l4-actor-sheet__close" onclick="l4CloseActorSheet()" aria-label="Close">×</button>
+    <div id="l4-actor-sheet-body"></div>
+  </div>
+</div>
+
+<div class="l4-actor-sheet" id="l4-inquiry-sheet" aria-hidden="true">
+  <div class="l4-actor-sheet__overlay" onclick="l4CloseInquirySheet()" aria-hidden="true"></div>
+  <div class="l4-actor-sheet__panel" role="dialog" aria-modal="true" aria-labelledby="l4-inquiry-sheet-title" onclick="event.stopPropagation()">
+    <div class="l4-actor-sheet__grab" aria-hidden="true"></div>
+    <button type="button" class="l4-actor-sheet__close" onclick="l4CloseInquirySheet()" aria-label="Close">×</button>
+    <div id="l4-inquiry-sheet-body"></div>
+  </div>
+</div>
+
 <!-- ── UID PANEL ─────────────────────────────────────────────────── -->
 <div class="uid-ov" id="uid-ov" onclick="closeUID()"></div>
 <div class="uid-pnl" id="uid-pnl">
@@ -243,7 +263,7 @@
       <div id="hrv-map-host" class="hrv-map-host"></div>
       <div id="hrv-map-summary" class="hrv-map-summary" hidden></div>
     </div>
-    <p class="hrv-map-foot">Focused view: ~300 merged demo parcels (adjacent atoms grouped into larger rectangles) plus one reserved grid cell for the trace parcel (same scale as a single atom, inset like neighbours). Narrow road bands. Street / Terrain / Satellite (default terrain). Demo only.</p>
+    <p class="hrv-map-foot">Focused view: ~300 merged field parcels (adjacent atoms grouped into larger rectangles) plus one reserved grid cell for the trace parcel (same scale as a single atom, inset like neighbours). Narrow road bands. Street / Terrain / Satellite (default terrain).</p>
   </div>
 </div>
 

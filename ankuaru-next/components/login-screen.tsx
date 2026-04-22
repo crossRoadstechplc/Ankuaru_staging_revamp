@@ -71,7 +71,7 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
         </form>
 
         <div className="login-help">
-          <div>Demo users:</div>
+          <div>Sample accounts:</div>
           <div>`nathan.trader` / `demo1234`</div>
           <div>`kaffa.ops` / `kaffaPass!`</div>
         </div>

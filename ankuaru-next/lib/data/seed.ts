@@ -1,6 +1,6 @@
 export const STATUS_OPTIONS = ["ALL", "PENDING", "DISPATCHED", "EXPORTED"] as const;
 export const VIEW_OPTIONS = ["cards", "timeline"] as const;
-export const RIBBON_TABS = ["home", "actors", "compliance", "reports"] as const;
+export const RIBBON_TABS = ["home", "actors", "transactions"] as const;
 
 export const EXPORTERS = [
   { id: "EXP-0041", name: "Horizon Ethiopia Export PLC", short: "Horizon" },
