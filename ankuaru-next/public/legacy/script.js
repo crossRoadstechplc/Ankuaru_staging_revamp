@@ -2572,7 +2572,19 @@ function renderL4Step(){
     </div>`;
   }else if(l4Step===4){
     const visChips=L4_VIS.map(v=>`<div onclick="l4ToggleVis('${v.id}')" style="padding:10px 12px;border:2px solid ${L4_NEW.vis.includes(v.id)?'#7C3AED':'#e5dccc'};border-radius:5px;cursor:pointer;background:${L4_NEW.vis.includes(v.id)?'rgba(124,58,237,.06)':'#fff'};display:flex;justify-content:space-between;margin-bottom:6px"><div><div style="font-weight:600;font-size:12px">${v.label}</div><div style="font-size:10px;color:var(--tx3)">${v.desc}</div></div><div style="font-size:14px;color:#7C3AED">${L4_NEW.vis.includes(v.id)?'✓':''}</div></div>`).join("");
-    body=`<div style="font-size:11px;color:var(--tx2);margin-bottom:10px">Visibility rules for this listing</div>${visChips}`;
+    var followersConfirm="";
+    if(L4_NEW.vis.includes("followers")){
+      var currentUser=l4GetCurrentUser();
+      var follows=L4_FOLLOWS&&typeof L4_FOLLOWS==="object"?L4_FOLLOWS:{};
+      var followers=Object.keys(follows).filter(function(user){
+        var arr=follows[user];
+        return Array.isArray(arr)&&currentUser&&arr.includes(currentUser);
+      });
+      followersConfirm=followers.length
+        ? `<div style="margin-top:10px;padding:10px 12px;border:1px solid #d9c8f8;background:rgba(124,58,237,.08);border-radius:6px"><div style="font-size:10px;font-weight:800;color:#5b21b6;letter-spacing:.05em;text-transform:uppercase;margin-bottom:6px">Followers who can see this listing (${followers.length})</div><div style="display:flex;flex-wrap:wrap;gap:6px">${followers.map(function(name){return `<span style="display:inline-flex;align-items:center;padding:4px 10px;border-radius:999px;background:#fff;border:1px solid #d8cdb8;font-size:11px;color:#1a1208">${l4HtmlEsc(String(name))}</span>`;}).join("")}</div></div>`
+        : `<div style="margin-top:10px;padding:10px 12px;border:1px solid #f0d4b8;background:rgba(245,158,11,.08);border-radius:6px;font-size:11px;color:#7c2d12"><b>No followers found</b> for this user yet. Followers-only visibility would currently have no audience.</div>`;
+    }
+    body=`<div style="font-size:11px;color:var(--tx2);margin-bottom:10px">Visibility rules for this listing</div>${visChips}${followersConfirm}`;
   }else{
     const delivery=DELIVERY_LOCATIONS.find(d=>d.id===L4_NEW.delivery);
     body=mgr([
