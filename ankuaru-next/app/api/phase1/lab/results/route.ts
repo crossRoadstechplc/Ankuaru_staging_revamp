@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { actorFromRequest } from "@/lib/phase1/auth";
 import { readPhase1Store, writePhase1Store } from "@/lib/phase1/store";
 import { makeId } from "@/lib/phase1/ids";
-import type { Event, LabResult, LabStatus } from "@/lib/phase1/types";
+import type { Event, LabResult, LabStatus, LotStatus } from "@/lib/phase1/types";
 
 export async function GET(req: NextRequest) {
   const actor = actorFromRequest(req);
@@ -45,10 +45,8 @@ export async function POST(req: NextRequest) {
   const now = new Date().toISOString();
 
   // Determine next lot status based on lab decision
-  const nextLotStatus =
-    status === "APPROVED" ? "READY_FOR_EXPORT" :
-    status === "FAILED" ? "QUARANTINED" :
-    "AT_LAB";
+  const nextLotStatus: LotStatus =
+    status === "APPROVED" ? "READY_FOR_EXPORT" : status === "FAILED" ? "QUARANTINED" : "AT_LAB";
 
   const labResult: LabResult = {
     id: makeId("lab"),

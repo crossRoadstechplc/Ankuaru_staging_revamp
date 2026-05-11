@@ -15,7 +15,7 @@ type ProcessRequest = {
   inputLotId: string;
   inputWeightKg: number;
   outputWeightKg: number;
-  outputForm: Exclude<LotForm, "BYPRODUCT">;
+  outputForm: LotForm;
   processingMethod: ProcessingMethod;
   byproducts?: ByproductInput[];
 };
