@@ -12,5 +12,61 @@
     "role": "Trader",
     "registeredDate": "2025-11-04T11:00:00.000Z",
     "modifiedDate": "2026-04-18T08:40:00.000Z"
+  },
+  {
+    "username": "admin",
+    "password": "admin1234",
+    "role": "Admin",
+    "registeredDate": "2026-05-06T00:00:00.000Z",
+    "modifiedDate": "2026-05-06T00:00:00.000Z"
+  },
+  {
+    "username": "farmer.demo",
+    "password": "farmer1234",
+    "role": "Farmer",
+    "registeredDate": "2026-05-06T00:00:00.000Z",
+    "modifiedDate": "2026-05-06T00:00:00.000Z"
+  },
+  {
+    "username": "aggregator.demo",
+    "password": "aggregator1234",
+    "role": "Aggregator",
+    "registeredDate": "2026-05-06T00:00:00.000Z",
+    "modifiedDate": "2026-05-06T00:00:00.000Z"
+  },
+  {
+    "username": "processor.demo",
+    "password": "processor1234",
+    "role": "Processor",
+    "registeredDate": "2026-05-06T00:00:00.000Z",
+    "modifiedDate": "2026-05-06T00:00:00.000Z"
+  },
+  {
+    "username": "transporter.demo",
+    "password": "transporter1234",
+    "role": "Transporter",
+    "registeredDate": "2026-05-06T00:00:00.000Z",
+    "modifiedDate": "2026-05-06T00:00:00.000Z"
+  },
+  {
+    "username": "lab.demo",
+    "password": "lab1234",
+    "role": "Lab",
+    "registeredDate": "2026-05-06T00:00:00.000Z",
+    "modifiedDate": "2026-05-06T00:00:00.000Z"
+  },
+  {
+    "username": "bank.demo",
+    "password": "bank1234",
+    "role": "Bank",
+    "registeredDate": "2026-05-06T00:00:00.000Z",
+    "modifiedDate": "2026-05-06T00:00:00.000Z"
+  },
+  {
+    "username": "regulator.demo",
+    "password": "regulator1234",
+    "role": "Regulator",
+    "registeredDate": "2026-05-06T00:00:00.000Z",
+    "modifiedDate": "2026-05-06T00:00:00.000Z"
   }
 ]

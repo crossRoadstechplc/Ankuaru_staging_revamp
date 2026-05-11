@@ -1,0 +1,50 @@
+{
+  "fields": [],
+  "lots": [
+    {
+      "id": "lot_6d2556aca28fc_19dfc10a183",
+      "publicLotCode": "LOT-F6C8-BP8J",
+      "farmerId": "farmer.demo",
+      "form": "CHERRY",
+      "weightKg": 800,
+      "status": "AT_FARM",
+      "validationStatus": "VALIDATED",
+      "createdAt": "2026-05-06T06:54:01.603Z",
+      "updatedAt": "2026-05-06T07:07:47.476Z"
+    }
+  ],
+  "events": [
+    {
+      "id": "evt_e9e82ee40b6f3_19dfc10a183",
+      "type": "PICK",
+      "timestamp": "2026-05-06T06:54:01.603Z",
+      "actorId": "farmer.demo",
+      "actorRole": "Farmer",
+      "inputLotIds": [],
+      "outputLotIds": [
+        "lot_6d2556aca28fc_19dfc10a183"
+      ]
+    },
+    {
+      "id": "evt_f5b82bdc4aa3_19dfc1d3b94",
+      "type": "VALIDATE_LOT",
+      "timestamp": "2026-05-06T07:07:47.476Z",
+      "actorId": "aggregator.demo",
+      "actorRole": "Aggregator",
+      "inputLotIds": [
+        "lot_6d2556aca28fc_19dfc10a183"
+      ],
+      "outputLotIds": [
+        "lot_6d2556aca28fc_19dfc10a183"
+      ],
+      "metadata": {
+        "decision": "VALIDATED",
+        "observedWeightKg": 800
+      }
+    }
+  ],
+  "vehicles": [],
+  "drivers": [],
+  "labResults": [],
+  "bankReviews": []
+}

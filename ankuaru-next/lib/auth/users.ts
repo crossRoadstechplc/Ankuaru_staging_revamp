@@ -1,9 +1,11 @@
 import users from "@/data/users.json";
 
+export type UserRole = "Trader" | "Admin" | "Farmer" | "Aggregator" | "Processor" | "Transporter" | "Lab" | "Bank" | "Regulator";
+
 export type DemoUser = {
   username: string;
   password: string;
-  role: "Trader";
+  role: UserRole;
   registeredDate: string;
   modifiedDate: string;
 };
