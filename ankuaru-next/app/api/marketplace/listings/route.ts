@@ -17,6 +17,12 @@ export async function PUT(request: Request) {
   if (!body.listings || typeof body.listings !== "object") {
     return NextResponse.json({ message: "Invalid listings payload." }, { status: 400 });
   }
-  await writeListings(body.listings);
-  return NextResponse.json({ ok: true, count: Object.keys(body.listings).length }, { headers: noStore });
+  const result = await writeListings(body.listings);
+  if (!result.ok) {
+    return NextResponse.json({ ok: false, message: result.message }, { status: 503, headers: noStore });
+  }
+  return NextResponse.json(
+    { ok: true, count: Object.keys(body.listings).length, persistedWith: result.persistedWith },
+    { headers: noStore },
+  );
 }

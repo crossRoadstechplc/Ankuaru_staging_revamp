@@ -200,7 +200,7 @@ export function LegacyShell() {
 
       (
         window as unknown as {
-          __ANKUARU_SYNC_LISTINGS?: (listings: Record<string, Record<string, unknown>>) => Promise<void>;
+          __ANKUARU_SYNC_LISTINGS?: (listings: Record<string, Record<string, unknown>>) => Promise<Response>;
           __ANKUARU_SET_LISTINGS?: (listings: Record<string, Record<string, unknown>>) => void;
           __ANKUARU_SYNC_NOTIFICATIONS?: (notifications: Record<string, unknown[]>) => Promise<void>;
           __ANKUARU_SET_FOLLOWS?: (follows: Record<string, string[]>) => void;
@@ -220,6 +220,7 @@ export function LegacyShell() {
         if (response.ok) {
           listingsSignatureRef.current = JSON.stringify(listings);
         }
+        return response;
       };
       (
         window as unknown as {

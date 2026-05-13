@@ -214,9 +214,19 @@ function l4NormalizeAuctionTimers(){
 function persistMarketplaceListings(){
   try{
     const snapshot=JSON.parse(JSON.stringify(LISTINGS));
+    function afterPut(res){
+      if(!res||res.ok)return;
+      const fallback="Could not save marketplace listings.";
+      res.json().then(function(j){
+        var m=j&&j.message?String(j.message):fallback;
+        if(typeof toast==="function")toast(m);
+      }).catch(function(){
+        if(typeof toast==="function")toast(fallback);
+      });
+    }
     const fn=window.__ANKUARU_SYNC_LISTINGS;
     if(typeof fn==="function"){
-      void fn(snapshot);
+      void Promise.resolve(fn(snapshot)).then(afterPut);
     }else{
       void fetch("/api/marketplace/listings?_="+Date.now(),{
         method:"PUT",
@@ -227,7 +237,7 @@ function persistMarketplaceListings(){
         },
         cache:"no-store",
         body:JSON.stringify({listings:snapshot}),
-      });
+      }).then(afterPut);
     }
   }catch(_e){}
 }
