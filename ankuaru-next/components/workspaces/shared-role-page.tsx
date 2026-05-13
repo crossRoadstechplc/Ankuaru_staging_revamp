@@ -21,7 +21,7 @@ export function SharedRolePage({ title, blurb }: SharedRolePageProps) {
     if (!isAuthenticated) router.replace("/");
   }, [isAuthenticated, router]);
 
-  if (!authUser || authUser.role === "Trader") return null;
+  if (!authUser || authUser.role === "Trader" || authUser.role === "Admin") return null;
   if (!(authUser.role in NAV_BY_ROLE)) return null;
 
   const role = authUser.role as NavRole;

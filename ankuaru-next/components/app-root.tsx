@@ -28,13 +28,12 @@ export function AppRoot() {
   useEffect(() => {
     if (!isAuthenticated || !authUser) return;
     const role = authUser.role;
-    if (role === "Trader") {
+    if (role === "Trader" || role === "Admin") {
       if (pathname !== "/") router.replace("/");
       return;
     }
 
     const SECTION_ROOTS: Partial<Record<typeof role, string>> = {
-      Admin: "/admin",
       Farmer: "/farmer",
       Aggregator: "/aggregator",
       Processor: "/processor",
@@ -61,6 +60,6 @@ export function AppRoot() {
   };
 
   if (!isAuthenticated) return <LoginScreen onLogin={onLogin} />;
-  if (authUser?.role === "Trader") return <LegacyShell />;
+  if (authUser?.role === "Trader" || authUser?.role === "Admin") return <LegacyShell />;
   return null;
 }

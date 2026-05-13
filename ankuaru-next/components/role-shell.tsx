@@ -104,19 +104,12 @@ export function RoleShell({
             ))}
           </nav>
 
-          {/* Role badge + logout */}
-          <button
-            type="button"
-            className="bs-back"
-            onClick={onLogout}
-            style={{ flexDirection: "column", alignItems: "flex-start", gap: 2 }}
-          >
-            <span style={{ fontSize: 9, color: "#4a3a2a", letterSpacing: ".12em", textTransform: "uppercase" }}>
-              {role}
-            </span>
-            <span style={{ fontSize: 11, color: "#8a7a6a" }}>{authUser.username}</span>
-            <span style={{ fontSize: 10, color: "#5a4a3a", marginTop: 2 }}>Logout →</span>
-          </button>
+          <div className="sidebar-auth-panel">
+            <div className="sidebar-auth-user">{`Role: ${role}`}</div>
+            <button type="button" className="sidebar-logout-btn" onClick={onLogout}>
+              Logout
+            </button>
+          </div>
         </div>
 
         {/* ── Content area ── */}
