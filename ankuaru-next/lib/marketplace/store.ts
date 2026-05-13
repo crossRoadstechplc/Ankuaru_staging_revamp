@@ -8,7 +8,7 @@ const REDIS_KEY = "ankuaru:marketplace:listings:v1";
 export type ListingsMap = Record<string, Record<string, unknown>>;
 
 export type WriteListingsResult =
-  | { ok: true; persistedWith: "redis" | "filesystem" }
+  | { ok: true; persistedWith: "redis" | "supabase" | "filesystem" }
   | { ok: false; message: string };
 
 /** True on Vercel, Netlify Functions, AWS Lambda, etc. — no durable local disk for JSON writes. */
@@ -20,10 +20,11 @@ function isEphemeralDeployment(): boolean {
   );
 }
 
-function redisHelp(): string {
+function persistenceHelp(): string {
   return (
-    "Configure a REST Redis compatible store (Upstash or Vercel KV): set UPSTASH_REDIS_REST_URL + UPSTASH_REDIS_REST_TOKEN, " +
-    "or KV_REST_API_URL + KV_REST_API_TOKEN. Without it, marketplace changes cannot persist on serverless hosts."
+    "For serverless demos without Redis: use Supabase free tier — create table `marketplace_listings (id int primary key, data jsonb not null)` " +
+    "and set `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` (Project Settings → API). " +
+    "Alternatively: `UPSTASH_REDIS_REST_URL` + `UPSTASH_REDIS_REST_TOKEN`, or `KV_REST_API_URL` + `KV_REST_API_TOKEN`."
   );
 }
 
@@ -36,6 +37,56 @@ function getRedis(): Redis | null {
   return new Redis({ url, token });
 }
 
+/** Supabase REST (free Postgres tier). Use service role key only on the server — never expose publicly. */
+function getSupabaseConfig(): { url: string; key: string } | null {
+  const rawUrl =
+    process.env.SUPABASE_URL?.trim() || process.env.NEXT_PUBLIC_SUPABASE_URL?.trim() || "";
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
+  if (!rawUrl || !key) return null;
+  return { url: rawUrl.replace(/\/+$/, ""), key };
+}
+
+async function fetchSupabaseListings(cfg: { url: string; key: string }): Promise<ListingsMap | null> {
+  const res = await fetch(`${cfg.url}/rest/v1/marketplace_listings?id=eq.1&select=data`, {
+    headers: {
+      apikey: cfg.key,
+      Authorization: `Bearer ${cfg.key}`,
+      Accept: "application/json",
+    },
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    const t = await res.text().catch(() => "");
+    throw new Error(`Supabase read HTTP ${res.status}: ${t}`);
+  }
+  const rows = (await res.json()) as { data: unknown }[];
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return null;
+  }
+  const raw = rows[0]?.data;
+  if (raw && typeof raw === "object" && !Array.isArray(raw)) {
+    return raw as ListingsMap;
+  }
+  return null;
+}
+
+async function upsertSupabaseListings(cfg: { url: string; key: string }, listings: ListingsMap): Promise<void> {
+  const res = await fetch(`${cfg.url}/rest/v1/marketplace_listings`, {
+    method: "POST",
+    headers: {
+      apikey: cfg.key,
+      Authorization: `Bearer ${cfg.key}`,
+      "Content-Type": "application/json",
+      Prefer: "resolution=merge-duplicates",
+    },
+    body: JSON.stringify({ id: 1, data: listings }),
+  });
+  if (!res.ok) {
+    const t = await res.text().catch(() => "");
+    throw new Error(`Supabase upsert HTTP ${res.status}: ${t}`);
+  }
+}
+
 async function readListingsFile(): Promise<ListingsMap> {
   const raw = await fs.readFile(LISTINGS_PATH, "utf-8");
   return JSON.parse(raw) as ListingsMap;
@@ -44,10 +95,9 @@ async function readListingsFile(): Promise<ListingsMap> {
 /**
  * Shared marketplace data.
  *
- * - **Local / single Node host:** reads and writes `data/listings.json`.
- * - **Vercel / Netlify / serverless:** the filesystem is not a writable database; configure
- *   `UPSTASH_REDIS_REST_URL` + `UPSTASH_REDIS_REST_TOKEN` (Upstash), or
- *   `KV_REST_API_URL` + `KV_REST_API_TOKEN` (Vercel KV). Redis is seeded from `data/listings.json` at build on first read.
+ * - **Local:** reads/writes `data/listings.json` when no cloud backend is configured.
+ * - **Redis:** `UPSTASH_*` or `KV_REST_*` env vars.
+ * - **Supabase (free tier, good for demos):** `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY`, table `marketplace_listings(id int pk, data jsonb)`.
  */
 export async function readListings(): Promise<ListingsMap> {
   const redis = getRedis();
@@ -60,6 +110,23 @@ export async function readListings(): Promise<ListingsMap> {
     await redis.set(REDIS_KEY, JSON.stringify(seed));
     return seed;
   }
+
+  const sb = getSupabaseConfig();
+  if (sb) {
+    try {
+      const fromDb = await fetchSupabaseListings(sb);
+      if (fromDb !== null) {
+        return fromDb;
+      }
+      const seed = await readListingsFile();
+      await upsertSupabaseListings(sb, seed);
+      return seed;
+    } catch (e) {
+      console.error("[marketplace] Supabase read failed, falling back to listings.json:", e);
+      return readListingsFile();
+    }
+  }
+
   return readListingsFile();
 }
 
@@ -82,6 +149,22 @@ export async function writeListings(listings: ListingsMap): Promise<WriteListing
     }
   }
 
+  const sb = getSupabaseConfig();
+  if (sb) {
+    try {
+      await upsertSupabaseListings(sb, listings);
+      try {
+        await fs.writeFile(LISTINGS_PATH, payload, "utf-8");
+      } catch {
+        // Optional mirror when running locally with Supabase.
+      }
+      return { ok: true, persistedWith: "supabase" };
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      return { ok: false, message: msg };
+    }
+  }
+
   try {
     await fs.writeFile(LISTINGS_PATH, payload, "utf-8");
     return { ok: true, persistedWith: "filesystem" };
@@ -91,7 +174,7 @@ export async function writeListings(listings: ListingsMap): Promise<WriteListing
     const looksServerlessFs =
       isEphemeralDeployment() || /EROFS|read-?only|EPERM|EACCES|ENOSPC/i.test(sys);
     if (looksServerlessFs) {
-      return { ok: false, message: `${base} ${redisHelp()}` };
+      return { ok: false, message: `${base} ${persistenceHelp()}` };
     }
     return { ok: false, message: base };
   }

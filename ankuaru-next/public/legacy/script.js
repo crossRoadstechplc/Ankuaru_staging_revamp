@@ -214,9 +214,17 @@ function l4NormalizeAuctionTimers(){
 function persistMarketplaceListings(){
   try{
     const snapshot=JSON.parse(JSON.stringify(LISTINGS));
-    function afterPut(res){
-      if(!res||res.ok)return;
+    function handlePutResponse(res){
+      if(res&&res.ok){
+        var commit=window.__ANKUARU_LISTINGS_PUT_COMMIT;
+        if(typeof commit==="function")commit(snapshot);
+        return;
+      }
       const fallback="Could not save marketplace listings.";
+      if(!res){
+        if(typeof toast==="function")toast(fallback);
+        return;
+      }
       res.json().then(function(j){
         var m=j&&j.message?String(j.message):fallback;
         if(typeof toast==="function")toast(m);
@@ -226,7 +234,7 @@ function persistMarketplaceListings(){
     }
     const fn=window.__ANKUARU_SYNC_LISTINGS;
     if(typeof fn==="function"){
-      void Promise.resolve(fn(snapshot)).then(afterPut);
+      void Promise.resolve(fn(snapshot)).then(handlePutResponse);
     }else{
       void fetch("/api/marketplace/listings?_="+Date.now(),{
         method:"PUT",
@@ -237,7 +245,7 @@ function persistMarketplaceListings(){
         },
         cache:"no-store",
         body:JSON.stringify({listings:snapshot}),
-      }).then(afterPut);
+      }).then(handlePutResponse);
     }
   }catch(_e){}
 }
@@ -249,6 +257,9 @@ window.__ANKUARU_SET_LISTINGS=function(next){
   l4BackfillListingTaxonomy();
   l4NormalizeAuctionTimers();
   if(viewMode==="market")renderMarket();
+};
+window.__ANKUARU_LISTINGS_SNAPSHOT=function(){
+  try{return JSON.parse(JSON.stringify(LISTINGS));}catch(_e){return{};}
 };
 const COMPANY_TYPES={PLC:"Private Limited Co.",SC:"Share Company",GP:"General Partnership",SP:"Sole Proprietor",COOP:"Primary Cooperative",UNION:"Cooperative Union"};
 const ACTOR_REGISTRY={

@@ -6,6 +6,34 @@ import { formatCrumb, formatMarket } from "@/lib/domain/format";
 import { HrvMapModal } from "@/components/hrv-map-modal";
 import { AUTH_STORAGE_KEY } from "@/lib/auth/session";
 
+/** Stable stringify so poll GET vs client PUT signatures match when only key order differs. */
+function stableListingsSignature(listings: Record<string, Record<string, unknown>>): string {
+  const keys = Object.keys(listings).sort();
+  const sorted: Record<string, Record<string, unknown>> = {};
+  for (const k of keys) sorted[k] = listings[k];
+  return JSON.stringify(sorted);
+}
+
+const LOCAL_ONLY_GRACE_MS = 120_000;
+
+/** Keep rows that exist only on the client while the server copy may lag briefly after PUT. */
+function mergeServerListingsWithLocalGrace(
+  server: Record<string, Record<string, unknown>>,
+  local: Record<string, Record<string, unknown>>,
+): Record<string, Record<string, unknown>> {
+  const merged: Record<string, Record<string, unknown>> = { ...server };
+  const now = Date.now();
+  for (const k of Object.keys(local)) {
+    if (merged[k] !== undefined) continue;
+    const row = local[k];
+    const created = row?.createdAt;
+    if (typeof created === "number" && now - created < LOCAL_ONLY_GRACE_MS) {
+      merged[k] = row;
+    }
+  }
+  return merged;
+}
+
 function mountMarketplaceTabs(root: HTMLElement) {
   const viewArea = root.querySelector<HTMLElement>("#view-area");
   const toolbar = root.querySelector<HTMLElement>(".main-toolbar");
@@ -144,6 +172,8 @@ function syncDomState(root: HTMLElement, state: ReturnType<typeof useAppStore.ge
 export function LegacyShell() {
   const rootRef = useRef<HTMLDivElement>(null);
   const listingsSignatureRef = useRef<string>("");
+  /** Skip GET→SET polling briefly after a successful save so we don't apply stale server snapshots. */
+  const suppressListingsPollUntilRef = useRef(0);
 
   useEffect(() => {
     let canceled = false;
@@ -201,13 +231,26 @@ export function LegacyShell() {
       (
         window as unknown as {
           __ANKUARU_SYNC_LISTINGS?: (listings: Record<string, Record<string, unknown>>) => Promise<Response>;
+          __ANKUARU_LISTINGS_PUT_COMMIT?: (listings: Record<string, Record<string, unknown>>) => void;
+          __ANKUARU_SET_LISTINGS?: (listings: Record<string, Record<string, unknown>>) => void;
+          __ANKUARU_SYNC_NOTIFICATIONS?: (notifications: Record<string, unknown[]>) => Promise<void>;
+          __ANKUARU_SET_FOLLOWS?: (follows: Record<string, string[]>) => void;
+          __ANKUARU_SET_NOTIFS?: (notifications: Record<string, unknown[]>) => void;
+        }
+      ).__ANKUARU_LISTINGS_PUT_COMMIT = (listings) => {
+        listingsSignatureRef.current = stableListingsSignature(listings);
+        suppressListingsPollUntilRef.current = Date.now() + 4000;
+      };
+      (
+        window as unknown as {
+          __ANKUARU_SYNC_LISTINGS?: (listings: Record<string, Record<string, unknown>>) => Promise<Response>;
           __ANKUARU_SET_LISTINGS?: (listings: Record<string, Record<string, unknown>>) => void;
           __ANKUARU_SYNC_NOTIFICATIONS?: (notifications: Record<string, unknown[]>) => Promise<void>;
           __ANKUARU_SET_FOLLOWS?: (follows: Record<string, string[]>) => void;
           __ANKUARU_SET_NOTIFS?: (notifications: Record<string, unknown[]>) => void;
         }
       ).__ANKUARU_SYNC_LISTINGS = async (listings) => {
-        const response = await fetch(`/api/marketplace/listings?_=${Date.now()}`, {
+        return await fetch(`/api/marketplace/listings?_=${Date.now()}`, {
           method: "PUT",
           headers: {
             "Content-Type": "application/json",
@@ -217,10 +260,6 @@ export function LegacyShell() {
           cache: "no-store",
           body: JSON.stringify({ listings }),
         });
-        if (response.ok) {
-          listingsSignatureRef.current = JSON.stringify(listings);
-        }
-        return response;
       };
       (
         window as unknown as {
@@ -241,20 +280,26 @@ export function LegacyShell() {
 
       const pullListings = async () => {
         try {
+          if (Date.now() < suppressListingsPollUntilRef.current) return;
           const response = await fetch(`/api/marketplace/listings?_=${Date.now()}`, {
             cache: "no-store",
             headers: { "Cache-Control": "no-cache", Pragma: "no-cache" },
           });
           const payload = (await response.json()) as { listings?: Record<string, Record<string, unknown>> };
           if (!payload.listings || canceled) return;
-          const nextSig = JSON.stringify(payload.listings);
+          const winSnap = window as unknown as {
+            __ANKUARU_LISTINGS_SNAPSHOT?: () => Record<string, Record<string, unknown>>;
+          };
+          const localSnap = winSnap.__ANKUARU_LISTINGS_SNAPSHOT?.() ?? {};
+          const merged = mergeServerListingsWithLocalGrace(payload.listings, localSnap);
+          const nextSig = stableListingsSignature(merged);
           if (nextSig === listingsSignatureRef.current) return;
           listingsSignatureRef.current = nextSig;
           (
             window as unknown as {
               __ANKUARU_SET_LISTINGS?: (listings: Record<string, Record<string, unknown>>) => void;
             }
-          ).__ANKUARU_SET_LISTINGS?.(payload.listings);
+          ).__ANKUARU_SET_LISTINGS?.(merged);
         } catch {
           // keep legacy in-file listings if API load fails
         }
