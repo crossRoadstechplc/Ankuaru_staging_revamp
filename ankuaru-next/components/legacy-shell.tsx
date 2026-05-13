@@ -207,7 +207,7 @@ export function LegacyShell() {
           __ANKUARU_SET_NOTIFS?: (notifications: Record<string, unknown[]>) => void;
         }
       ).__ANKUARU_SYNC_LISTINGS = async (listings) => {
-        await fetch(`/api/marketplace/listings?_=${Date.now()}`, {
+        const response = await fetch(`/api/marketplace/listings?_=${Date.now()}`, {
           method: "PUT",
           headers: {
             "Content-Type": "application/json",
@@ -217,6 +217,9 @@ export function LegacyShell() {
           cache: "no-store",
           body: JSON.stringify({ listings }),
         });
+        if (response.ok) {
+          listingsSignatureRef.current = JSON.stringify(listings);
+        }
       };
       (
         window as unknown as {
@@ -383,7 +386,6 @@ export function LegacyShell() {
           __ANKUARU_LEGACY_MAIN_VIEW?: unknown;
           __ANKUARU_GO_TO_MARKETPLACE?: unknown;
         };
-        delete win.__ANKUARU_SYNC_LISTINGS;
         delete win.__ANKUARU_SYNC_NOTIFICATIONS;
         delete win.__ANKUARU_LEGACY_MAIN_VIEW;
         delete win.__ANKUARU_GO_TO_MARKETPLACE;

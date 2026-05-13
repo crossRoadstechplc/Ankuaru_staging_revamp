@@ -1,5 +1,8 @@
 @import "./legacy.css";
 @import "tailwindcss";
+/* Leaflet base styles (required for tile positioning). Load after Tailwind so
+   `.leaflet-tile { max-width: none !important }` wins over preflight `img` rules. */
+@import "leaflet/dist/leaflet.css";
 
 :root {
   --background: #f2eee8;
