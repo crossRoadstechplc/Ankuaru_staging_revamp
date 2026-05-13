@@ -16,6 +16,46 @@ function stableListingsSignature(listings: Record<string, Record<string, unknown
 
 const LOCAL_ONLY_GRACE_MS = 120_000;
 
+/** Browser-only last-good snapshot so listings survive refresh when serverless has no DB/KV (demo / offline). */
+const DEMO_LISTINGS_STORAGE_KEY = "ankuaru:listings:demo-backup-v1";
+
+function readDemoListingsBackup(): Record<string, Record<string, unknown>> {
+  if (typeof window === "undefined") return {};
+  try {
+    const raw = localStorage.getItem(DEMO_LISTINGS_STORAGE_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as unknown;
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
+    return parsed as Record<string, Record<string, unknown>>;
+  } catch {
+    return {};
+  }
+}
+
+function saveDemoListingsBackup(listings: Record<string, Record<string, unknown>>): void {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(DEMO_LISTINGS_STORAGE_KEY, JSON.stringify(listings));
+  } catch {
+    // quota / private mode
+  }
+}
+
+/** Fill in listing IDs the API omitted (stale read / no Supabase on host) from last successful client snapshot. */
+function mergeServerWithDemoBackup(
+  server: Record<string, Record<string, unknown>>,
+): Record<string, Record<string, unknown>> {
+  const backup = readDemoListingsBackup();
+  if (!Object.keys(backup).length) return server;
+  const merged: Record<string, Record<string, unknown>> = { ...server };
+  for (const k of Object.keys(backup)) {
+    if (merged[k] === undefined) {
+      merged[k] = backup[k];
+    }
+  }
+  return merged;
+}
+
 /** Keep rows that exist only on the client while the server copy may lag briefly after PUT. */
 function mergeServerListingsWithLocalGrace(
   server: Record<string, Record<string, unknown>>,
@@ -240,6 +280,7 @@ export function LegacyShell() {
       ).__ANKUARU_LISTINGS_PUT_COMMIT = (listings) => {
         listingsSignatureRef.current = stableListingsSignature(listings);
         suppressListingsPollUntilRef.current = Date.now() + 4000;
+        saveDemoListingsBackup(listings);
       };
       (
         window as unknown as {
@@ -287,11 +328,12 @@ export function LegacyShell() {
           });
           const payload = (await response.json()) as { listings?: Record<string, Record<string, unknown>> };
           if (!payload.listings || canceled) return;
+          const base = mergeServerWithDemoBackup(payload.listings);
           const winSnap = window as unknown as {
             __ANKUARU_LISTINGS_SNAPSHOT?: () => Record<string, Record<string, unknown>>;
           };
           const localSnap = winSnap.__ANKUARU_LISTINGS_SNAPSHOT?.() ?? {};
-          const merged = mergeServerListingsWithLocalGrace(payload.listings, localSnap);
+          const merged = mergeServerListingsWithLocalGrace(base, localSnap);
           const nextSig = stableListingsSignature(merged);
           if (nextSig === listingsSignatureRef.current) return;
           listingsSignatureRef.current = nextSig;
@@ -300,6 +342,7 @@ export function LegacyShell() {
               __ANKUARU_SET_LISTINGS?: (listings: Record<string, Record<string, unknown>>) => void;
             }
           ).__ANKUARU_SET_LISTINGS?.(merged);
+          saveDemoListingsBackup(merged);
         } catch {
           // keep legacy in-file listings if API load fails
         }

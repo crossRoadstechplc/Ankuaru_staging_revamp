@@ -22,9 +22,9 @@ function isEphemeralDeployment(): boolean {
 
 function persistenceHelp(): string {
   return (
-    "For serverless demos without Redis: use Supabase free tier — create table `marketplace_listings (id int primary key, data jsonb not null)` " +
-    "and set `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` (Project Settings → API). " +
-    "Alternatively: `UPSTASH_REDIS_REST_URL` + `UPSTASH_REDIS_REST_TOKEN`, or `KV_REST_API_URL` + `KV_REST_API_TOKEN`."
+    "For serverless demos without Redis: create table `marketplace_listings (id int primary key, data jsonb not null)` " +
+    "and set `SUPABASE_URL` (or `NEXT_PUBLIC_SUPABASE_URL`) + `SUPABASE_SERVICE_ROLE_KEY` (legacy) or `SUPABASE_SECRET_KEY` (new `sb_secret_...` key). " +
+    "Dashboard: Settings → API Keys. Alternatively Redis/KV env vars."
   );
 }
 
@@ -37,11 +37,15 @@ function getRedis(): Redis | null {
   return new Redis({ url, token });
 }
 
-/** Supabase REST (free Postgres tier). Use service role key only on the server — never expose publicly. */
+/** Supabase REST (free Postgres tier). Use a secret / service_role key only on the server — never expose publicly. */
 function getSupabaseConfig(): { url: string; key: string } | null {
   const rawUrl =
     process.env.SUPABASE_URL?.trim() || process.env.NEXT_PUBLIC_SUPABASE_URL?.trim() || "";
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
+  /** Legacy JWT `service_role`, or new platform secret key `sb_secret_...` — see https://supabase.com/docs/guides/api/api-keys */
+  const key =
+    process.env.SUPABASE_SERVICE_ROLE_KEY?.trim() ||
+    process.env.SUPABASE_SECRET_KEY?.trim() ||
+    "";
   if (!rawUrl || !key) return null;
   return { url: rawUrl.replace(/\/+$/, ""), key };
 }
@@ -71,19 +75,70 @@ async function fetchSupabaseListings(cfg: { url: string; key: string }): Promise
 }
 
 async function upsertSupabaseListings(cfg: { url: string; key: string }, listings: ListingsMap): Promise<void> {
-  const res = await fetch(`${cfg.url}/rest/v1/marketplace_listings`, {
+  const baseHeaders: Record<string, string> = {
+    apikey: cfg.key,
+    Authorization: `Bearer ${cfg.key}`,
+    "Content-Type": "application/json",
+  };
+
+  /** PostgREST upsert: PK conflict on `id` merges row (required for reliable serverless persistence). */
+  const upsert = await fetch(`${cfg.url}/rest/v1/marketplace_listings?on_conflict=id`, {
     method: "POST",
     headers: {
-      apikey: cfg.key,
-      Authorization: `Bearer ${cfg.key}`,
-      "Content-Type": "application/json",
-      Prefer: "resolution=merge-duplicates",
+      ...baseHeaders,
+      Prefer: "resolution=merge-duplicates,return=minimal",
+    },
+    body: JSON.stringify([{ id: 1, data: listings }]),
+    cache: "no-store",
+  });
+
+  if (upsert.ok) {
+    return;
+  }
+
+  const primaryErr = await upsert.text().catch(() => "");
+
+  const rowRes = await fetch(`${cfg.url}/rest/v1/marketplace_listings?id=eq.1&select=id`, {
+    headers: {
+      ...baseHeaders,
+      Accept: "application/json",
+    },
+    cache: "no-store",
+  });
+  const rowJson = (await rowRes.json().catch(() => [])) as unknown;
+  const exists = Array.isArray(rowJson) && rowJson.length > 0;
+
+  if (exists) {
+    const patch = await fetch(`${cfg.url}/rest/v1/marketplace_listings?id=eq.1`, {
+      method: "PATCH",
+      headers: {
+        ...baseHeaders,
+        Prefer: "return=minimal",
+      },
+      body: JSON.stringify({ data: listings }),
+      cache: "no-store",
+    });
+    if (!patch.ok) {
+      const t = await patch.text().catch(() => "");
+      throw new Error(`Supabase PATCH failed HTTP ${patch.status}: ${t}`);
+    }
+    return;
+  }
+
+  const insert = await fetch(`${cfg.url}/rest/v1/marketplace_listings`, {
+    method: "POST",
+    headers: {
+      ...baseHeaders,
+      Prefer: "return=minimal",
     },
     body: JSON.stringify({ id: 1, data: listings }),
+    cache: "no-store",
   });
-  if (!res.ok) {
-    const t = await res.text().catch(() => "");
-    throw new Error(`Supabase upsert HTTP ${res.status}: ${t}`);
+  if (!insert.ok) {
+    const t = await insert.text().catch(() => "");
+    throw new Error(
+      `Supabase listings write failed. Upsert: HTTP ${upsert.status} ${primaryErr}; INSERT: HTTP ${insert.status} ${t}`,
+    );
   }
 }
 
@@ -115,7 +170,7 @@ export async function readListings(): Promise<ListingsMap> {
   if (sb) {
     try {
       const fromDb = await fetchSupabaseListings(sb);
-      if (fromDb !== null) {
+      if (fromDb !== null && Object.keys(fromDb).length > 0) {
         return fromDb;
       }
       const seed = await readListingsFile();
