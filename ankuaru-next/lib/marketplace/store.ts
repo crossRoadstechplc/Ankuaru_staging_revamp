@@ -22,10 +22,30 @@ function isEphemeralDeployment(): boolean {
 
 function persistenceHelp(): string {
   return (
-    "For serverless demos without Redis: create table `marketplace_listings (id int primary key, data jsonb not null)` " +
-    "and set `SUPABASE_URL` (or `NEXT_PUBLIC_SUPABASE_URL`) + `SUPABASE_SERVICE_ROLE_KEY` (legacy) or `SUPABASE_SECRET_KEY` (new `sb_secret_...` key). " +
-    "Dashboard: Settings → API Keys. Alternatively Redis/KV env vars."
+    "Vercel: Project Settings → Environment Variables → add for Production (then Redeploy): " +
+    "`SUPABASE_URL` = Project URL `https://xxxx.supabase.co`, and `SUPABASE_SERVICE_ROLE_KEY` (legacy JWT) or `SUPABASE_SECRET_KEY` (`sb_secret_...`). " +
+    "Never use `NEXT_PUBLIC_*` for secret keys. Create table `marketplace_listings (id int primary key, data jsonb not null)`. " +
+    "Or use Redis: `UPSTASH_REDIS_REST_URL` + `UPSTASH_REDIS_REST_TOKEN`."
   );
+}
+
+/** Non-null when only half of Supabase env is set (common misconfiguration). */
+function supabasePartialEnvMessage(): string | null {
+  const url =
+    process.env.SUPABASE_URL?.trim() ||
+    process.env.NEXT_PUBLIC_SUPABASE_URL?.trim() ||
+    "";
+  const key =
+    process.env.SUPABASE_SERVICE_ROLE_KEY?.trim() ||
+    process.env.SUPABASE_SECRET_KEY?.trim() ||
+    "";
+  if (url && !key) {
+    return "SUPABASE_URL is set but SUPABASE_SERVICE_ROLE_KEY or SUPABASE_SECRET_KEY is missing for this deployment.";
+  }
+  if (key && !url) {
+    return "A Supabase secret key is set but SUPABASE_URL (or NEXT_PUBLIC_SUPABASE_URL) is missing.";
+  }
+  return null;
 }
 
 function getRedis(): Redis | null {
@@ -216,8 +236,20 @@ export async function writeListings(listings: ListingsMap): Promise<WriteListing
       return { ok: true, persistedWith: "supabase" };
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      return { ok: false, message: msg };
+      return {
+        ok: false,
+        message: `${msg} If this is 401/permission errors, use SUPABASE_SERVICE_ROLE_KEY (service_role JWT) or SUPABASE_SECRET_KEY (sb_secret_…), not the anon/publishable key. Ensure table marketplace_listings exists.`,
+      };
     }
+  }
+
+  // Vercel/Netlify: never persist via repo JSON — fail fast with a clear message.
+  if (isEphemeralDeployment()) {
+    const partial = supabasePartialEnvMessage();
+    return {
+      ok: false,
+      message: partial ?? `No Redis or Supabase configured; filesystem is read-only on this host. ${persistenceHelp()}`,
+    };
   }
 
   try {
@@ -226,8 +258,7 @@ export async function writeListings(listings: ListingsMap): Promise<WriteListing
   } catch (e) {
     const sys = e instanceof Error ? e.message : String(e);
     const base = `Cannot write listings.json (${sys}).`;
-    const looksServerlessFs =
-      isEphemeralDeployment() || /EROFS|read-?only|EPERM|EACCES|ENOSPC/i.test(sys);
+    const looksServerlessFs = /EROFS|read-?only|EPERM|EACCES|ENOSPC/i.test(sys);
     if (looksServerlessFs) {
       return { ok: false, message: `${base} ${persistenceHelp()}` };
     }
