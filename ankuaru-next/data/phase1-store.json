@@ -1,5 +1,30 @@
 {
-  "fields": [],
+  "fields": [
+    {
+      "id": "field_l0xsoqrt_mp5371tv",
+      "name": "plot a",
+      "farmerId": "farmer.demo",
+      "areaSqm": 0,
+      "createdAt": "2026-05-14T06:07:47.203Z",
+      "updatedAt": "2026-05-14T06:07:47.203Z"
+    },
+    {
+      "id": "field_8py8bzmj_mp542k3k",
+      "name": "plot a",
+      "farmerId": "farmer.demo",
+      "areaSqm": 7890,
+      "createdAt": "2026-05-14T06:32:17.216Z",
+      "updatedAt": "2026-05-14T06:32:17.216Z"
+    },
+    {
+      "id": "field_0b8x1obr_mparx0xo",
+      "name": "plot a",
+      "farmerId": "farmer.demo",
+      "areaSqm": 7890,
+      "createdAt": "2026-05-18T05:38:40.764Z",
+      "updatedAt": "2026-05-18T05:38:40.764Z"
+    }
+  ],
   "lots": [
     {
       "id": "lot_6d2556aca28fc_19dfc10a183",
@@ -11,6 +36,29 @@
       "validationStatus": "VALIDATED",
       "createdAt": "2026-05-06T06:54:01.603Z",
       "updatedAt": "2026-05-06T07:07:47.476Z"
+    },
+    {
+      "id": "lot_d1a97te3_mparxaj3",
+      "publicLotCode": "LOT-SJCH-9DY8",
+      "farmerId": "farmer.demo",
+      "fieldId": "field_8py8bzmj_mp542k3k",
+      "form": "CHERRY",
+      "weightKg": 50,
+      "status": "AT_FARM",
+      "validationStatus": "VALIDATED",
+      "createdAt": "2026-05-18T05:38:53.199Z",
+      "updatedAt": "2026-05-18T05:39:13.452Z"
+    },
+    {
+      "id": "lot_2jnb7od7_mpary75l",
+      "publicLotCode": "AGG-P3MW-UXGP",
+      "farmerId": "—",
+      "form": "CHERRY",
+      "weightKg": 850,
+      "status": "READY_FOR_PROCESSING",
+      "validationStatus": "VALIDATED",
+      "createdAt": "2026-05-18T05:39:35.481Z",
+      "updatedAt": "2026-05-18T05:39:35.481Z"
     }
   ],
   "events": [
@@ -41,10 +89,68 @@
         "decision": "VALIDATED",
         "observedWeightKg": 800
       }
+    },
+    {
+      "id": "evt_v1e48vh3_mparxaj3",
+      "type": "PICK",
+      "timestamp": "2026-05-18T05:38:53.199Z",
+      "actorId": "farmer.demo",
+      "actorRole": "Farmer",
+      "inputLotIds": [],
+      "outputLotIds": [
+        "lot_d1a97te3_mparxaj3"
+      ],
+      "metadata": {
+        "fieldId": "field_8py8bzmj_mp542k3k"
+      }
+    },
+    {
+      "id": "evt_rfnam76g_mparxq5o",
+      "type": "VALIDATE_LOT",
+      "timestamp": "2026-05-18T05:39:13.452Z",
+      "actorId": "aggregator.demo",
+      "actorRole": "Aggregator",
+      "inputLotIds": [
+        "lot_d1a97te3_mparxaj3"
+      ],
+      "outputLotIds": [
+        "lot_d1a97te3_mparxaj3"
+      ],
+      "metadata": {
+        "decision": "VALIDATED"
+      }
+    },
+    {
+      "id": "evt_y6ni7q4p_mpary75l",
+      "type": "AGGREGATE",
+      "timestamp": "2026-05-18T05:39:35.481Z",
+      "actorId": "aggregator.demo",
+      "actorRole": "Aggregator",
+      "inputLotIds": [
+        "lot_6d2556aca28fc_19dfc10a183",
+        "lot_d1a97te3_mparxaj3"
+      ],
+      "outputLotIds": [
+        "lot_2jnb7od7_mpary75l"
+      ],
+      "metadata": {
+        "outputWeightKg": 850,
+        "inputCount": 2
+      }
     }
   ],
   "vehicles": [],
   "drivers": [],
   "labResults": [],
-  "bankReviews": []
+  "bankReviews": [
+    {
+      "id": "bnk_0hlno87i_mpasm85n",
+      "applicantUserId": "app",
+      "reviewerBankUserId": "bank.demo",
+      "reviewStatus": "PENDING_REVIEW",
+      "notes": "notes",
+      "createdAt": "2026-05-18T05:58:16.523Z",
+      "updatedAt": "2026-05-18T05:58:16.523Z"
+    }
+  ]
 }
